@@ -134,6 +134,25 @@
   .files-actions{display:flex;flex-wrap:wrap;gap:8px}
   a.tile:focus-visible{outline:4px solid var(--g)}
   .sr{position:absolute;left:-9999px}
+  .ls-work{border:2px solid var(--k);padding:24px;display:flex;flex-direction:column;gap:16px;background:var(--w)}
+  .ls-work-top{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:600}
+  .ls-spin{display:inline-flex;gap:6px}
+  .ls-spin i{width:12px;height:12px;background:var(--k);animation:ls-blink 1.2s infinite}
+  .ls-spin i:nth-child(2){animation-delay:.2s}
+  .ls-spin i:nth-child(3){animation-delay:.4s}
+  .ls-dots::after{content:'';animation:ls-dots 1.2s steps(4,end) infinite}
+  .ls-code{position:relative;border:2px solid var(--k);padding:16px 20px;display:flex;flex-direction:column;gap:10px;overflow:hidden;min-height:118px}
+  .ls-codeline{height:10px;background:#e8e8e8}
+  .ls-scanline{position:absolute;left:0;right:0;top:-4px;height:4px;background:var(--k);animation:ls-sweep 1.5s linear infinite}
+  .ls-bar{height:12px;border:2px solid var(--k);overflow:hidden}
+  .ls-bar-fill{height:100%;background:repeating-linear-gradient(-45deg,var(--k) 0 10px,transparent 10px 20px);animation:ls-march .7s linear infinite}
+  .badge.work{animation:ls-pulse 1s ease-in-out infinite}
+  @keyframes ls-blink{0%,60%,100%{opacity:.15}30%{opacity:1}}
+  @keyframes ls-dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+  @keyframes ls-sweep{0%{top:-4px}100%{top:100%}}
+  @keyframes ls-march{to{background-position:28px 0}}
+  @keyframes ls-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  @media (prefers-reduced-motion:reduce){.ls-scanline,.ls-bar-fill,.ls-spin i,.badge.work,.ls-dots::after{animation:none}}
 </style>
 </head>
 <body>
@@ -244,6 +263,13 @@ function gate(goStep, goLabel, text) {
     <div class="row"><button class="btn k" data-act="goto" data-arg="${goStep}">${esc(goLabel)}</button></div></div>`;
 }
 function errBox(S) { return S.error ? `<div class="err" role="alert">${esc(S.error)}</div>` : ''; }
+function workPanel(text) {
+  return `<div class="ls-work" role="status" aria-live="polite">
+    <div class="ls-work-top"><span class="ls-spin" aria-hidden="true"><i></i><i></i><i></i></span><span>${esc(text)}</span><span class="ls-dots" aria-hidden="true"></span></div>
+    <div class="ls-code mono" aria-hidden="true"><div class="ls-codeline" style="width:72%"></div><div class="ls-codeline" style="width:46%"></div><div class="ls-codeline" style="width:83%"></div><div class="ls-codeline" style="width:38%"></div><div class="ls-codeline" style="width:64%"></div><div class="ls-codeline" style="width:55%"></div><div class="ls-scanline"></div></div>
+    <div class="ls-bar" aria-hidden="true"><div class="ls-bar-fill"></div></div>
+  </div>`;
+}
 
 /* ---- Security scan ---- */
 function scanStep1(S) {
@@ -271,7 +297,8 @@ function scanStep2(S) {
   return `<div class="col">
     <div style="display:flex;flex-direction:column;gap:12px"><div class="eyebrow">Engine</div>${tiles(SCAN_ENGINES, S.engine, 'engine')}</div>
     ${scopeLine}
-    <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Scanning' : done ? 'Scan again' : 'Scan for vulnerabilities'}</button><div style="font-size:16px;font-weight:500">${esc(status)}</div></div>
+    <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Scanning' : done ? 'Scan again' : 'Scan for vulnerabilities'}</button><div style="font-size:16px;font-weight:500">${esc(status)}${S.running ? '<span class="ls-dots" aria-hidden="true"></span>' : ''}</div></div>
+    ${S.running ? workPanel('Scanning your code' + (S.engine === 'offline' ? ' with the offline rule engine' : ' with Mistral Large 4 agents')) : ''}
     ${errBox(S)}
     <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(trace, 'Waiting for a scan')}</div></div>`;
 }
@@ -364,7 +391,8 @@ function migStep2(S) {
   return `<div class="col">
     <div style="display:flex;flex-direction:column;gap:12px"><div class="eyebrow">Engine</div>${tiles(MIG_ENGINES, S.engine, 'engine')}</div>
     ${scopeLine}
-    <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Migrating' : done ? 'Run again' : 'Run migration workflow'}</button><div style="font-size:16px;font-weight:500">${esc(status)}</div></div>
+    <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Migrating' : done ? 'Run again' : 'Run migration workflow'}</button><div style="font-size:16px;font-weight:500">${esc(status)}${S.running ? '<span class="ls-dots" aria-hidden="true"></span>' : ''}</div></div>
+    ${S.running ? workPanel('Running the migration workflow' + (S.engine === 'offline' ? ' with the offline detector and 2to3' : ' with the Mistral Large 4 migration agent')) : ''}
     ${errBox(S)}
     <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(done ? (S.result.trace || []) : [], 'Waiting for a run')}</div></div>`;
 }
