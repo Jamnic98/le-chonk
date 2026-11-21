@@ -26,7 +26,7 @@ def _payload(files: list[dict], languages: set[str] | None = None) -> str:
     return "\n".join(parts) or "(no files)"
 
 
-def _complete_json(client: Mistral, model: str, system: str, user: str, schema_cls, name: str, log, retries: int = 4):
+def complete_json(client: Mistral, model: str, system: str, user: str, schema_cls, name: str, log, retries: int = 4):
     import time
     last_err = None
     for attempt in range(retries):
@@ -57,17 +57,17 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print) -> 
     for lang in langs:
         log(f"  analyzing {lang} files with Mistral Large 4 ...")
         system = prompts.load_registry_prompt(f"sentinel-analyst-{lang}", {"language": lang, "language_notes": prompts.LANGUAGE_NOTES[lang]}, api_key) or prompts.analyst_prompt(lang)
-        out = _complete_json(client, model, system, _payload(files, {lang}), FindingList, "FindingList", log)
+        out = complete_json(client, model, system, _payload(files, {lang}), FindingList, "FindingList", log)
         for f in out.findings:
             findings.append(f.model_dump() | {"source": f"mistral-large-4 ({lang}-analyst)"})
         trace.append(f"{lang}-analyst reported {len(out.findings)} findings")
     findings.sort(key=lambda x: (x["file"], x["line"]))
     rem_in = json.dumps([{k: f[k] for k in ("id", "rule_id", "title", "cwe", "file", "line", "evidence", "description")} for f in findings])
     log("  remediation agent ...")
-    rems = _complete_json(client, model, prompts.REMEDIATION_SYSTEM, rem_in, RemediationList, "RemediationList", log)
+    rems = complete_json(client, model, prompts.REMEDIATION_SYSTEM, rem_in, RemediationList, "RemediationList", log)
     trace.append(f"remediation-agent produced {len(rems.remediations)} remediations")
     log("  migration advisor ...")
-    mig = _complete_json(
+    mig = complete_json(
         client, model, prompts.MIGRATION_SYSTEM,
         json.dumps({"manifest": [{"path": f["path"], "language": f["lang"]} for f in files], "findings": findings}),
         MigrationPlan, "MigrationPlan", log)
