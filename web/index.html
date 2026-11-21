@@ -309,6 +309,11 @@ function counts(r) {
   return c;
 }
 function cweUrl(cwe) { const n = String(cwe).split('-')[1] || ''; return 'https://cwe.mitre.org/data/definitions/' + encodeURIComponent(n) + '.html'; }
+function saveCards(S) {
+  const saveBox = `<div class="card"><div class="ch">Save this scan</div><div class="ci"><div class="row" style="flex:1;flex-wrap:wrap"><input data-bind="saveName" type="text" placeholder="Name this scan, e.g. payroll-audit" value="${esc(S.saveName || '')}" style="flex:1;min-width:220px;border:2px solid var(--k);padding:12px 14px;font-size:15px;min-height:44px"><button class="btn k" data-act="savescan">Save</button></div></div></div>`;
+  const savedList = (st.savedScans && st.savedScans.length) ? `<div class="card"><div class="ch">Saved scans</div>${st.savedScans.map(x => `<div class="ci"><button class="rowbtn" data-act="loadscan" data-arg="${esc(x.name)}">${esc(x.name)}</button><span style="margin-left:auto;color:var(--g);font-size:13px">${esc(String(x.target || ''))} · ${x.findings} findings · ${esc(String(x.saved_at || '').slice(0, 16).replace('T', ' '))}</span></div>`).join('')}</div>` : '';
+  return saveBox + savedList;
+}
 function scanStep3(S) {
   const r = S.report, c = counts(r);
   const fl = [['all', 'All', r.findings.length]].concat(SEVERITIES.map(s => [s, SEV_LABEL[s], c[s]]));
@@ -317,7 +322,7 @@ function scanStep3(S) {
     <td><button class="rowbtn" data-act="finding" data-arg="${esc(f.id)}">${esc(f.title)}</button></td>
     <td>${esc(f.cwe)}</td><td class="mono" style="font-size:14px">${esc(f.file)}:${esc(f.line)}</td><td style="font-size:14px">${esc(f.source)}, confidence ${esc(f.confidence)}</td></tr>`).join('');
   const parts = SEVERITIES.filter(s => c[s]).map(s => c[s] + ' ' + s).join(', ');
-  return `<div class="col"><div style="font-size:18px;font-weight:600">${esc(nodot(r.summary || (r.findings.length + ' findings: ' + parts)))}</div>
+  return `<div class="col">${saveCards(S)}<div style="font-size:18px;font-weight:600">${esc(nodot(r.summary || (r.findings.length + ' findings: ' + parts)))}</div>
     <div class="tiles">${fl.map(d => `<button class="tile slim" data-act="filter" data-arg="${d[0]}" aria-pressed="${S.filter === d[0] ? 'true' : 'false'}"><span class="num">${d[2]}</span><span class="cap">${esc(d[1])}</span></button>`).join('')}</div>
     <div class="box"><table style="min-width:780px"><thead><tr><th>Severity</th><th>Finding</th><th>CWE</th><th>Location</th><th>Source</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No findings in this view</td></tr>'}</tbody></table></div></div>`;
 }
@@ -356,9 +361,7 @@ function scanStep5(S) {
   const phases = (m.phases || []).map((p, i) => `<div class="phase"><div class="pn">${i + 1}</div><div class="pt">${esc(nodot(String(p).replace(/^Phase\s*\d+\s*[-:]\s*/i, '')))}</div></div>`).join('');
   const mods = (m.modules || []).slice().sort((a, b) => a.order - b.order).map(x => `<tr><td>${esc(x.order)}</td><td style="font-weight:600">${esc(x.component)}</td><td>${esc(x.current)}</td><td>${esc(x.target)}</td><td>${esc(x.effort)}</td><td>${esc(cap(x.risk))}</td></tr>`).join('');
   const qw = (m.quick_wins || []).length ? `<div class="card"><div class="ch">Quick wins to apply immediately</div>${m.quick_wins.map(q => `<div class="ci" style="font-size:18px;font-weight:600">${esc(nodot(q))}</div>`).join('')}</div>` : '';
-    const saveBox = `<div class="card"><div class="ch">Save this scan</div><div class="ci"><div class="row" style="flex:1;flex-wrap:wrap"><input data-bind="saveName" type="text" placeholder="Name this scan, e.g. payroll-audit" value="${esc(S.saveName || '')}" style="flex:1;min-width:220px;border:2px solid var(--k);padding:12px 14px;font-size:15px;min-height:44px"><button class="btn k" data-act="savescan">Save</button></div></div></div>`;
-  const savedList = (st.savedScans && st.savedScans.length) ? `<div class="card"><div class="ch">Saved scans</div>${st.savedScans.map(x => `<div class="ci"><button class="rowbtn" data-act="loadscan" data-arg="${esc(x.name)}">${esc(x.name)}</button><span style="margin-left:auto;color:var(--g);font-size:13px">${esc(String(x.target || ''))} · ${x.findings} findings · ${esc(String(x.saved_at || '').slice(0, 16).replace('T', ' '))}</span></div>`).join('')}</div>` : '';
-return `<div class="col" style="gap:48px">
+return `<div class="col" style="gap:48px">${saveCards(S)}
     <div style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">Export the report</div>${exportTiles('scan', ['html', 'md', 'json', 'sarif'])}</div>
     <div class="black"><div class="label">Migration strategy</div><div class="big">${esc(nodot(m.strategy || 'No strategy returned'))}</div><p>${esc(nodot(m.summary || ''))}</p></div>
     ${qw}
