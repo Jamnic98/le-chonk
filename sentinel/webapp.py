@@ -63,7 +63,11 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         try:
             if u.path == "/":
+                self._send((WEB / "marketing.html").read_bytes(), "text/html; charset=utf-8")
+            elif u.path == "/app":
                 self._send((WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
+            elif u.path == "/one-pager.pdf":
+                self._send((WEB / "one-pager.pdf").read_bytes(), "application/pdf")
             elif u.path == "/api/health":
                 sdk = True
                 try:
