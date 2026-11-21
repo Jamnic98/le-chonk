@@ -65,7 +65,7 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
             except Exception:
                 pass
 
-    client = Mistral(api_key=api_key, server_url=prompts.API_URL, timeout=240)
+    client = Mistral(api_key=api_key, server_url=prompts.API_URL, timeout_ms=240_000)
     n = len(files)
     trace = ["direct engine: mistral-large-4, per-file parallel analysis (" + str(n) + " files, 4 workers)"]
 
