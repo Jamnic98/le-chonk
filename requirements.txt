@@ -1,0 +1,4 @@
+mistralai>=3.7
+mistralai-agents>=1.1.2,<1.2
+httpx>=0.27
+pydantic>=2

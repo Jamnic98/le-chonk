@@ -25,6 +25,17 @@
   #drop{border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13px;margin-top:10px}
   #drop.over{border-color:var(--acc);color:var(--acc)}
   .chips span{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:11px;margin:2px 4px 2px 0}
+  .chips .chip{display:inline-flex;gap:6px;align-items:center}
+  .chips .chip b{font-weight:600;cursor:pointer;color:var(--acc)}
+  .chips .chip b:hover{text-decoration:underline}
+  .chips .x{cursor:pointer;color:var(--crit);padding:0 5px;border-radius:6px;font-weight:700}
+  .chips .x:hover{background:#3a1d1d}
+  .chips .v{cursor:pointer;padding:0 5px;border-radius:6px}
+  .chips .v:hover{background:#1f2a44}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10;align-items:center;justify-content:center}
+  .modal-in{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:840px;width:92%;max-height:82vh;display:flex;flex-direction:column}
+  #pvhead{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  #pvbody{margin:0;padding:14px;overflow:auto;font-size:12px;white-space:pre-wrap}
   .stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
   .stat{border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px}
   .voice{background:#1f2a44;border:1px solid #3b5bdb;border-radius:8px;padding:10px 14px;margin:12px 0;font-size:14px}
@@ -71,6 +82,7 @@
       </div>
       <div id="drop">…or drag &amp; drop source files here</div>
       <div class="chips" id="filechips" style="margin-top:10px"></div>
+      <div class="muted" style="margin-top:6px">click a file to analyze it · 👁 preview source · × remove</div>
       <div style="margin-top:14px">
         <button class="act" id="scanbtn" onclick="scan()">Scan for vulnerabilities</button>
         <button class="act secondary" id="micbtn" onclick="toggleMic()"><span id="recdot" style="display:none"></span>Voice command (Voxtral)</button>
@@ -91,6 +103,7 @@
         <select id="engine2"><option value="auto">engine: auto</option><option value="direct">engine: Mistral Large 4</option><option value="offline">engine: offline</option></select>
       </div>
       <div class="chips" id="filechips2" style="margin-top:10px"></div>
+      <div class="muted" style="margin-top:6px">click a file to run the Py2→Py3 migration on it · 👁 preview source · × remove</div>
       <div style="margin-top:14px">
         <button class="act" id="migbtn" onclick="migrate()">Run migration workflow</button>
         <span id="migstatus" class="muted"></span>
@@ -106,6 +119,7 @@
   </section>
 </main>
 
+<div id="pv" class="modal" onclick="if(event.target===this)this.style.display='none'"><div class="modal-in"><div id="pvhead"></div><pre id="pvbody"></pre></div></div>
 <script>
 const state = {files: [], files2: [], report: null, mig: null, rec: null, chunks: []};
 const $ = id => document.getElementById(id);
@@ -122,10 +136,28 @@ async function loadSamples(kind){
   if(kind==='py2'){ state.files2 = r.files; renderChips2(); } else { state.files = r.files; renderChips(); }
 }
 function renderChips(){
-  $('filechips').innerHTML = state.files.map(f=>`<span>${esc(f.name)} · ${f.content.length}B</span>`).join('') || '<span class="muted">no files loaded</span>';
+  $('filechips').innerHTML = state.files.length
+    ? state.files.map((f,i)=>`<span class="chip"><b title="click to analyze this file" onclick="analyzeFile(${i},'files')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files')">×</span></span>`).join('')
+    : '<span class="muted">no files loaded</span>';
 }
 function renderChips2(){
-  $('filechips2').innerHTML = state.files2.map(f=>`<span>${esc(f.name)} · ${f.content.length}B</span>`).join('') || '<span class="muted">no files loaded</span>';
+  $('filechips2').innerHTML = state.files2.length
+    ? state.files2.map((f,i)=>`<span class="chip"><b title="click to run the migration on this file" onclick="analyzeFile(${i},'files2')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files2')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files2')">×</span></span>`).join('')
+    : '<span class="muted">no files loaded</span>';
+}
+function analyzeFile(i, which){
+  if(which === 'files') scanWith([state.files[i]]);
+  else migrateWith([state.files2[i]]);
+}
+function previewFile(i, which){
+  const f = state[which][i]; if(!f) return;
+  $('pvhead').textContent = f.name + '  ·  ' + f.content.length + ' bytes';
+  $('pvbody').textContent = f.content;
+  $('pv').style.display = 'flex';
+}
+function removeFile(i, which){
+  state[which].splice(i, 1);
+  (which === 'files' ? renderChips : renderChips2)();
 }
 function addFiles(fl){ for(const f of fl){ const rd=new FileReader(); rd.onload=()=>{state.files.push({name:f.name, content:rd.result}); renderChips();}; rd.readAsText(f);} }
 function addFiles2(fl){ for(const f of fl){ const rd=new FileReader(); rd.onload=()=>{state.files2.push({name:f.name, content:rd.result}); renderChips2();}; rd.readAsText(f);} }
@@ -138,12 +170,16 @@ function log(msg){ const l=$('log'); l.style.display='block'; l.textContent += m
 
 async function scan(){
   const pathVal = ($('pathinput').value||'').trim();
-  if(!state.files.length && !pathVal){ alert('Load/drop files or enter a codebase path first'); return; }
+  if(state.files.length) return scanWith(state.files);
+  if(!pathVal){ alert('Load/drop files or enter a codebase path first'); return; }
+  return scanWith(null, pathVal);
+}
+async function scanWith(files, pathVal){
   $('scanbtn').disabled = true; $('scanstatus').textContent = 'scanning… (agents working)';
   $('log').style.display='none'; $('log').textContent='';
   try{
-    const body = {engine: $('engine').value, path: pathVal || 'upload'};
-    if(state.files.length) body.files = state.files;
+    const body = {engine: $('engine').value, path: pathVal || (files && files.length===1 ? files[0].name : 'upload')};
+    if(files) body.files = files;
     const r = await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body)});
     const data = await r.json();
@@ -241,13 +277,15 @@ async function speakSummary(){
 }
 
 async function migrate(){
-  const files = state.files2.length ? state.files2 : null;
+  return migrateWith(state.files2.length ? state.files2 : null);
+}
+async function migrateWith(files){
   $('migbtn').disabled = true; $('migstatus').textContent = 'running workflow…';
   $('steps').style.display='flex';
   [['st1',true],['st2',false],['st3',false],['st4',false]].forEach(([id,done])=>{$(id).className='step'+(done?' done':'');});
   try{
     const r = await fetch('/api/migrate', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({files, path:'samples/python2', engine: $('engine2').value})});
+      body: JSON.stringify({files, path: files && files.length===1 ? files[0].name : 'samples/python2', engine: $('engine2').value})});
     const d = await r.json();
     if(d.error) throw new Error(d.error);
     state.mig = d;
