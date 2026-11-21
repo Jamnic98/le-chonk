@@ -59,6 +59,46 @@ Answer with JSON only, no prose, matching: {strategy, summary, quick_wins: [...]
 Guidance: COBOL -> expose CICS/IMS transactions behind a REST facade (e.g. z/OS Connect), containerize, migrate module-by-module to JVM/.NET (or keep hardened COBOL), with data reconciliation jobs. PHP -> upgrade to a supported PHP 8.x first (biggest security win), then adopt Laravel or Symfony, replace ext/mysql with PDO. Python -> Python 3.12+, typed code, FastAPI/Django, pinned dependencies. Put security quick wins (secrets removal, SQLi, eval/exec) first."""
 
 
+MIGRATION_CODE_SYSTEM = """You are the migration engineer of Legacy Sentinel. Input: JSON {target, report: {summary, findings, remediations, migration}, files: [{path, lang, content}]}.
+Task: produce the migrated codebase that resolves the vulnerabilities in the report, following the report's remediation steps/patches and migration plan.
+Rules:
+- For every file that must change, and every new file the migration needs (tests, config, dependency manifests), output the COMPLETE new file content in files[]. Never output diffs or partial snippets.
+- path must be the repo-relative path of the file; reuse the existing path when modifying a file, use a new relative path for new files. Never absolute paths, never "..".
+- Fix every critical and high finding using its remediation: parameterized queries/prepared statements, no eval/exec, subprocess with arg lists and shell=False, safe deserialization, no secrets in source, modern crypto, verify=True, framework security features.
+- Otherwise preserve behavior and public APIs exactly; keep the code idiomatic for the target stack named in the migration plan.
+- Do not include real secrets (inputs are already redacted); do not invent credentials.
+- Omit files that need no change.
+Answer with JSON only, no prose, no markdown fences, matching the required schema."""
+
+_SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+MAX_REPORT_FINDINGS = 60
+MAX_FILE_CHARS = 40_000
+MAX_PAYLOAD_CHARS = 220_000
+
+
+def migration_code_payload(target: str, report: dict, files: list[dict]) -> dict:
+    findings = sorted(report.get("findings", []), key=lambda f: _SEVERITY_RANK.get(f.get("severity"), 9))[:MAX_REPORT_FINDINGS]
+    remediations = report.get("remediations", [])[:MAX_REPORT_FINDINGS]
+    file_parts, total = [], 0
+    for f in files:
+        chunk = {"path": f["path"], "lang": f["lang"], "content": f["redacted"][:MAX_FILE_CHARS]}
+        size = len(json.dumps(chunk))
+        if total + size > MAX_PAYLOAD_CHARS:
+            chunk = {"path": f["path"], "lang": f["lang"], "content": "[truncated: too many files for one call]"}
+        total += len(json.dumps(chunk))
+        file_parts.append(chunk)
+    return {
+        "target": target,
+        "report": {
+            "summary": report.get("summary", ""),
+            "findings": [{k: f.get(k) for k in ("id", "rule_id", "title", "cwe", "severity", "confidence", "file", "line", "evidence", "description")} for f in findings],
+            "remediations": [{k: r.get(k) for k in ("finding_id", "rule_id", "summary", "steps", "patch")} for r in remediations],
+            "migration": report.get("migration", {}),
+        },
+        "files": file_parts,
+    }
+
+
 def analyst_prompt(language: str) -> str:
     return (ANALYST_SYSTEM
             .replace("{{language}}", language)

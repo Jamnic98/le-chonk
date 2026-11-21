@@ -74,3 +74,16 @@ class FindingList(BaseModel):
 
 class RemediationList(BaseModel):
     remediations: list[Remediation]
+
+
+class MigratedFile(BaseModel):
+    path: str
+    content: str
+    change_summary: str = ""
+
+
+class MigrationResult(BaseModel):
+    summary: str
+    remaining_risks: list[str] = Field(default_factory=list)
+    suggested_tests: list[str] = Field(default_factory=list)
+    files: list[MigratedFile]

@@ -70,12 +70,43 @@ def cmd_demo(a) -> None:
 
 
 def cmd_migrate(a) -> None:
-    from . import migrate, scanner
-    files = scanner.collect_from_path(a.path)
-    if not files:
-        print("no python files found")
+    from . import fetch
+    target = getattr(a, "dir", None) or a.path
+    if not target:
+        print("usage: sentinel migrate <path-or-repo-url> [--dir PATH] [--report report.json] [--out DIR]")
         sys.exit(2)
-    res = migrate.run_migration(a.path, files, engine=a.engine, out_dir=a.out, log=print)
+    if getattr(a, "report", None):
+        from . import migrator
+        out = a.out or str(ROOT / "reports" / "migration")
+        res = migrator.run_report_migration(target, a.report, out, engine=a.engine, log=print)
+        b = ", ".join(f"{v} {k}" for k, v in res["findings_before"].items()) or "none"
+        af = ", ".join(f"{v} {k}" for k, v in res["findings_after"].items()) or "none"
+        print(f"\n=== Report-driven migration: {res['target']} ===")
+        print(f"engine={res['engine']}  model={res['model']}  report={res['report']}")
+        print(res["summary"])
+        print(f"findings before: {b}")
+        print(f"findings after re-scan: {af}")
+        print(f"migrated files ({len(res['files_written'])}):")
+        for p in res["files_written"]:
+            print(f"  {p}")
+        if res["remaining_risks"]:
+            print("remaining risks:")
+            for r in res["remaining_risks"]:
+                print("  -", r)
+        print(f"rescan report: {res['rescan_report']}")
+        print(f"migration report: {out}/migration.json")
+        return
+    from . import migrate, scanner
+    path, cleanup = fetch.resolve_target(target)
+    try:
+        files = scanner.collect_from_path(path)
+        if not files:
+            print("no python files found")
+            sys.exit(2)
+        res = migrate.run_migration(target, files, engine=a.engine, out_dir=a.out, log=print)
+    finally:
+        if cleanup:
+            cleanup()
     print(f"\n=== Py2→Py3 migration workflow: {res['target']} ===")
     print("engine:", res["engine"], " model:", res["model"])
     print(res["summary"])
@@ -186,10 +217,12 @@ def main(argv=None) -> None:
     d.add_argument("--out", default=None)
     d.set_defaults(fn=cmd_demo)
 
-    m = sub.add_parser("migrate", help="Python 2 -> 3 migration workflow (needs-to-change + what-changed report)")
-    m.add_argument("path")
+    m = sub.add_parser("migrate", help="Py2->Py3 workflow, or report-driven LLM migration with --report <scan report.json>")
+    m.add_argument("path", nargs="?", default=None, help="local path or repo URL of the code to migrate")
+    m.add_argument("--dir", dest="dir", default=None, help="directory containing files (alternative to the positional path)")
+    m.add_argument("--report", default=None, help="scan report.json to drive the migration, then re-scan the migrated output")
     m.add_argument("--engine", default="auto", choices=["auto", "direct", "offline"])
-    m.add_argument("--out", default=None)
+    m.add_argument("--out", default=None, help="output dir for migrated code + reports (default reports/migration)")
     m.set_defaults(fn=cmd_migrate)
 
     v = sub.add_parser("voice", help="transcribe a voice command with Voxtral and execute it")

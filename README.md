@@ -37,6 +37,7 @@ python3 -m sentinel scan <path-or-repo-url> [--engine auto|sdk|direct|offline] [
 python3 -m sentinel <repo-url>                          # shorthand: scan a GitHub repo URL
 python3 -m sentinel --dir <path>                        # shorthand: scan a local directory
 python3 -m sentinel migrate <path> [--out DIR]                 # Py2→Py3 workflow
+python3 -m sentinel migrate <path-or-repo-url> --report <scan>/report.json --out <dir>   # report-driven migration: mistral-large-4 rewrites the code per the vuln report, then re-scans the migrated output (before/after findings in <dir>/migration.json + <dir>/rescan/)
 python3 -m sentinel voice <audio-file> --dir samples --speak-summary   # Voxtral STT → scan → TTS summary
 python3 -m sentinel make-voice-demo --out reports/voice_command.wav    # synthesize demo command (Voxtral TTS)
 python3 -m sentinel serve --host 127.0.0.1 --port 8000
