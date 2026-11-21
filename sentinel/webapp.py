@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import migrate as migrate_mod
-from . import prompts, scanner, voxtral
+from . import prompts, scanner
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
