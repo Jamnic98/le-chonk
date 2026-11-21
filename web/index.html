@@ -189,8 +189,14 @@ const MIG_HEADS = [
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nodot = s => String(s == null ? '' : s).replace(/\.\s*$/, '');
 const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+function serverHint() {
+  if (location.protocol === 'file:') return 'This page was opened straight from disk, so it cannot reach the app server. Start it with `python -m sentinel serve --port 8000`, then open http://127.0.0.1:8000/app';
+  return 'Cannot reach the server at ' + location.origin + ' — make sure `python -m sentinel serve --port 8000` is running, then refresh this page';
+}
 async function api(url, opts) {
-  const r = await fetch(url, opts);
+  let r;
+  try { r = await fetch(url, opts); }
+  catch (e) { throw new Error(serverHint()); }
   let d;
   try { d = await r.json(); } catch (e) { throw new Error('The server returned an unreadable response'); }
   if (!r.ok || (d && d.error)) throw new Error((d && d.error) || ('Request failed with status ' + r.status));
@@ -202,6 +208,7 @@ const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type'
 const st = {
   mode: 'scan',
   health: null,
+  serverDown: false,
   savedScans: null,
   scan: { step: 1, source: 'url', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null, saveName: '' },
   mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null, saveName: '' }
@@ -458,7 +465,7 @@ function render() {
   const steps = isScan ? SCAN_STEPS : MIG_STEPS, heads = isScan ? SCAN_HEADS : MIG_HEADS;
   const last = steps.length;
   const h = st.health;
-  const health = h ? `${h.model}, API key ${h.has_api_key ? 'set' : 'not set, offline mode'}, Agents SDK ${h.agents_sdk ? 'ready' : 'not installed'}` : 'Checking server status';
+  const health = st.serverDown ? 'server unreachable — restart it and refresh' : h ? `${h.model}, API key ${h.has_api_key ? 'set' : 'not set, offline mode'}, Agents SDK ${h.agents_sdk ? 'ready' : 'not installed'}` : 'Checking server status';
   const engList = isScan ? SCAN_ENGINES : MIG_ENGINES;
   const engLabel = engList.filter(d => d[0] === S.engine)[0][1];
   const target = isScan ? ({ demo: 'Demo codebase', upload: 'Uploaded files', path: 'Local path', url: 'GitHub repository' }[S.source]) : (S.source === 'sample' ? 'Python 2 sample codebase' : 'Uploaded files');
@@ -481,7 +488,7 @@ function render() {
     <div class="shell">
       <nav class="rail" aria-label="Workflow"><div class="railhead">Workflow</div>${rail}
         <div class="railmeta"><div><div class="label grey">Files</div><div class="metav">${esc(fileCount)}</div></div><div><div class="label grey">${isScan ? 'Findings' : 'Changes found'}</div><div class="metav">${esc(found)}</div></div></div></nav>
-      <main class="main">
+      <main class="main">${st.serverDown ? `<div class="card inv" style="margin-bottom:20px"><div class="ch">Cannot reach the app server</div><div class="ci" style="font-size:16px;line-height:1.5">${esc(serverHint())}</div></div>` : ''}
         <div class="head"><div class="eyebrow">Step ${steps[S.step - 1][0]} of 0${last}</div><h1>${esc(heads[S.step - 1][0])}</h1><div class="lead">${esc(heads[S.step - 1][1])}</div></div>
         ${body}
         <div class="nav"><button class="btn" data-act="back" ${S.step === 1 ? 'aria-disabled="true"' : ''}>Back</button><button class="btn k" data-act="next" ${nextOff ? 'aria-disabled="true"' : ''}>${nextLabels[S.step - 1]}</button></div>
@@ -521,10 +528,11 @@ async function runScan() {
   S.running = false; rerender();
 }
 async function pollJob(S) {
+  let misses = 0;
   while (S.running && S.job) {
     await new Promise(r => setTimeout(r, 700));
     let j;
-    try { j = await api('/api/jobs/' + S.job); } catch (e) { continue; }
+    try { j = await api('/api/jobs/' + S.job); misses = 0; } catch (e) { if (++misses >= 8) { S.error = e.message; S.running = false; rerender(); return; } continue; }
     S.jobSteps = j.steps || S.jobSteps; S.jobTrace = (j.trace || S.jobTrace || []).filter(l => !/^model call/.test(l)); S.jobAgents = j.agents || S.jobAgents;
     if (j.status === 'done') { S.jobResult = j.result; S.running = false; S.step = 3; rerender(); return; }
     if (j.status === 'error') { S.error = j.error || 'Job failed'; S.running = false; rerender(); return; }
@@ -614,8 +622,15 @@ app.addEventListener('drop', e => { const d = e.target.closest('#drop'); if (d) 
 document.getElementById('fp').addEventListener('change', e => { readFiles(e.target.files); e.target.value = ''; });
 
 /* ===== Start ===== */
+if (location.protocol === 'file:') st.serverDown = true;
 render();
-api('/api/health').then(h => { st.health = h; rerender(); }).catch(() => { st.health = null; });
+(async () => {
+  for (let i = 0; i < 5; i++) {
+    try { st.health = await api('/api/health'); st.serverDown = false; rerender(); return; }
+    catch (e) { await new Promise(r => setTimeout(r, 600)); }
+  }
+  st.serverDown = true; rerender();
+})();
 api('/api/scans').then(r => { st.savedScans = r.scans || []; rerender(); }).catch(() => {});
 loadSamples('legacy');
 loadSamples('py2');
