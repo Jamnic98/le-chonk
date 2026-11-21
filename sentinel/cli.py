@@ -45,13 +45,22 @@ def _print_summary(data: dict) -> None:
 
 
 def cmd_scan(a) -> None:
-    from . import scanner
-    files = scanner.collect_from_path(a.path)
-    if not files:
-        print("no supported files found (cobol/php/python)")
+    from . import fetch, scanner
+    target = getattr(a, "dir", None) or a.path
+    if not target:
+        print("usage: sentinel scan <path-or-repo-url> | sentinel --dir <path>")
         sys.exit(2)
-    data = scanner.run_scan(a.path, files, engine=a.engine, out_dir=a.out, log=print)
-    _print_summary(data)
+    path, cleanup = fetch.resolve_target(target)
+    try:
+        files = scanner.collect_from_path(path)
+        if not files:
+            print("no supported files found (cobol/php/python)")
+            sys.exit(2)
+        data = scanner.run_scan(target, files, engine=a.engine, out_dir=a.out, log=print)
+        _print_summary(data)
+    finally:
+        if cleanup:
+            cleanup()
 
 
 def cmd_demo(a) -> None:
@@ -154,13 +163,20 @@ def cmd_serve(a) -> None:
     webapp.serve(a.host, a.port)
 
 
+SUBCOMMANDS = {"scan", "demo", "migrate", "voice", "make-voice-demo", "selftest", "serve"}
+
+
 def main(argv=None) -> None:
     _load_env()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] not in SUBCOMMANDS and argv[0] not in ("-h", "--help"):
+        argv.insert(0, "scan")
     p = argparse.ArgumentParser(prog="sentinel", description="Legacy Sentinel — agentic legacy-code security scanner & migration advisor (COBOL/PHP/Python)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("scan", help="scan a file or directory")
-    s.add_argument("path")
+    s = sub.add_parser("scan", help="scan a local path or a GitHub repo URL (default subcommand)")
+    s.add_argument("path", nargs="?", default=None, help="local path or repo URL, e.g. https://github.com/owner/repo")
+    s.add_argument("--dir", dest="dir", default=None, help="directory containing files (alternative to the positional path)")
     s.add_argument("--engine", default="auto", choices=["auto", "sdk", "direct", "offline"])
     s.add_argument("--out", default=None)
     s.set_defaults(fn=cmd_scan)

@@ -33,7 +33,9 @@ Engines: `auto` (Agents SDK if a key is present) → `sdk` (Mistral Agents SDK m
 ## CLI
 
 ```bash
-python3 -m sentinel scan <path> [--engine auto|sdk|direct|offline] [--out DIR]
+python3 -m sentinel scan <path-or-repo-url> [--engine auto|sdk|direct|offline] [--out DIR]   # local path or GitHub URL (shallow clone)
+python3 -m sentinel <repo-url>                          # shorthand: scan a GitHub repo URL
+python3 -m sentinel --dir <path>                        # shorthand: scan a local directory
 python3 -m sentinel migrate <path> [--out DIR]                 # Py2→Py3 workflow
 python3 -m sentinel voice <audio-file> --dir samples --speak-summary   # Voxtral STT → scan → TTS summary
 python3 -m sentinel make-voice-demo --out reports/voice_command.wav    # synthesize demo command (Voxtral TTS)
