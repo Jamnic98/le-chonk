@@ -105,14 +105,7 @@ def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str 
 
     chosen = engine
     if chosen == "auto":
-        if key:
-            try:
-                import mistralai.agents  # noqa: F401
-                chosen = "sdk"
-            except Exception:
-                chosen = "direct"
-        else:
-            chosen = "offline"
+        chosen = "direct" if key else "offline"
 
     step(2, "working", f"engine: {chosen}")
     result = None

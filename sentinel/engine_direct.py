@@ -65,7 +65,7 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
             except Exception:
                 pass
 
-    client = Mistral(api_key=api_key, server_url=prompts.API_URL)
+    client = Mistral(api_key=api_key, server_url=prompts.API_URL, timeout=240)
     n = len(files)
     trace = ["direct engine: mistral-large-4, per-file parallel analysis (" + str(n) + " files, 4 workers)"]
 
@@ -83,7 +83,7 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
         return findings_one
 
     findings = []
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    with ThreadPoolExecutor(max_workers=6) as ex:
         for res in ex.map(analyze_one, list(enumerate(files))):
             findings.extend(res)
     pstep(f"analysts done: {len(findings)} raw findings from {n} files")

@@ -330,7 +330,7 @@ function scanStep4(S) {
   const rems = {}; r.remediations.forEach(x => { rems[x.finding_id] = x; });
   const f = list.find(x => x.id === S.sel) || list[0];
   const rem = rems[f.id];
-  const queue = list.map(x => `<button class="qbtn" data-act="finding" data-arg="${esc(x.id)}" aria-pressed="${x.id === f.id ? 'true' : 'false'}"><span class="pill ${esc(x.severity)}">${esc(x.severity)}</span><span class="qt">${esc(x.title)}</span><span class="ql mono">${esc(x.file)}:${esc(x.line)}</span></button>`).join('');
+  const queue = list.map(x => `<button class="qbtn" data-act="finding" data-arg="${esc(x.id)}" aria-pressed="${x.id === f.id ? 'true' : 'false'}"><span class="pill ${esc(x.severity)}">${esc(x.severity)}</span><span class="qt">${esc(x.title)}</span><span class="ql mono">${esc(x.file)}:${esc(x.line)}</span><span class="ql" style="margin-left:auto">${rems[x.id] ? '✓ fix ready' : 'no fix'}</span></button>`).join('');
   let fix = '<div style="font-size:17px">No remediation was returned for this finding</div>';
   if (rem) {
     fix = `<div class="h2" style="font-size:22px;letter-spacing:-0.02em;line-height:1.2">${esc(nodot(rem.summary))}</div>
@@ -523,7 +523,7 @@ async function pollJob(S) {
     let j;
     try { j = await api('/api/jobs/' + S.job); } catch (e) { continue; }
     S.jobSteps = j.steps || S.jobSteps; S.jobTrace = (j.trace || S.jobTrace || []).filter(l => !/^model call/.test(l)); S.jobAgents = j.agents || S.jobAgents;
-    if (j.status === 'done') { S.jobResult = j.result; S.running = false; rerender(); return; }
+    if (j.status === 'done') { S.jobResult = j.result; S.running = false; S.step = 3; rerender(); return; }
     if (j.status === 'error') { S.error = j.error || 'Job failed'; S.running = false; rerender(); return; }
     rerender();
   }
