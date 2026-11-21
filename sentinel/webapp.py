@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
+import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -37,6 +40,17 @@ def _safe_path(p: str) -> Path:
     if str(base) != str(ROOT.resolve()) and not str(base).startswith(str(ROOT.resolve()) + os.sep):
         raise ValueError("path outside project root")
     return base
+
+
+_GH_URL = re.compile(r"^https://(www\.)?github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?(\.git)?$")
+
+
+def _clone_and_collect(url: str) -> tuple[list[dict], str]:
+    tmp = tempfile.mkdtemp(prefix="sentinel_repo_")
+    r = subprocess.run(["git", "clone", "--depth", "1", url, tmp], capture_output=True, timeout=180)
+    if r.returncode != 0:
+        raise ValueError("git clone failed: " + r.stderr.decode(errors="replace")[:200])
+    return scanner.collect_from_path(tmp), url
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -103,9 +117,18 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self._body() or b"{}")
             key = os.environ.get("MISTRAL_API_KEY", "")
             if p == "/api/scan":
-                files = scanner.collect_from_payload(body["files"]) if body.get("files") else scanner.collect_from_path(_safe_path(body.get("path", "samples")))
+                raw_path = str(body.get("path", "samples"))
+                if _GH_URL.match(raw_path.strip()):
+                    files, label = _clone_and_collect(raw_path.strip().rstrip("/").removesuffix(".git"))
+                elif body.get("files"):
+                    files, label = scanner.collect_from_payload(body["files"]), raw_path or "upload"
+                else:
+                    files, label = scanner.collect_from_path(_safe_path(raw_path)), raw_path
+                if not files:
+                    self._json({"error": f"no COBOL/PHP/Python files found for {label}"}, 400)
+                    return
                 out = REPORTS / f"web_scan_{int(time.time())}"
-                data = scanner.run_scan(body.get("path", "upload"), files, engine=body.get("engine", "auto"),
+                data = scanner.run_scan(label, files, engine=body.get("engine", "auto"),
                                         out_dir=str(out), voice_command=body.get("voice_command"), log=_silent)
                 LAST["scan"] = str(out)
                 self._json(data)

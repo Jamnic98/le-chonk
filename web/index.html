@@ -2,336 +2,563 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Legacy Sentinel — agentic legacy-code security & migration</title>
+<title>Legacy Sentinel</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--txt:#e6edf3;--muted:#8b949e;--acc:#58a6ff;--crit:#e5484d;--high:#f76b15;--med:#ffc53d;--low:#46a758;--info:#6e7681}
+  /* Black and white enterprise theme. System fonts only, so the page makes no third party requests */
+  :root{--k:#000;--g:#4a4a4a;--w:#fff}
   *{box-sizing:border-box}
-  body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);margin:0}
-  header{padding:18px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  header h1{font-size:19px;margin:0}
-  .badges span{display:inline-block;border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:11px;color:var(--muted);margin-left:6px}
-  nav{display:flex;gap:8px;padding:10px 28px;border-bottom:1px solid var(--border)}
-  nav button{background:var(--panel);color:var(--txt);border:1px solid var(--border);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px}
-  nav button.active{border-color:var(--acc);color:var(--acc)}
-  main{padding:20px 28px;max-width:1150px}
-  .panel{display:none}.panel.active{display:block}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px}
-  button.act{background:#238636;color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;margin-right:8px}
-  button.act.secondary{background:var(--panel);border:1px solid var(--border);color:var(--txt)}
-  button.act.warn{background:#9e2a2b}
-  button.act:disabled{opacity:.5;cursor:default}
-  select,input[type=file]{background:var(--bg);color:var(--txt);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px}
-  #drop{border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13px;margin-top:10px}
-  #drop.over{border-color:var(--acc);color:var(--acc)}
-  .chips span{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:11px;margin:2px 4px 2px 0}
-  .chips .chip{display:inline-flex;gap:6px;align-items:center}
-  .chips .chip b{font-weight:600;cursor:pointer;color:var(--acc)}
-  .chips .chip b:hover{text-decoration:underline}
-  .chips .x{cursor:pointer;color:var(--crit);padding:0 5px;border-radius:6px;font-weight:700}
-  .chips .x:hover{background:#3a1d1d}
-  .chips .v{cursor:pointer;padding:0 5px;border-radius:6px}
-  .chips .v:hover{background:#1f2a44}
-  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10;align-items:center;justify-content:center}
-  .modal-in{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:840px;width:92%;max-height:82vh;display:flex;flex-direction:column}
-  #pvhead{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace}
-  #pvbody{margin:0;padding:14px;overflow:auto;font-size:12px;white-space:pre-wrap}
-  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-  .stat{border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px}
-  .voice{background:#1f2a44;border:1px solid #3b5bdb;border-radius:8px;padding:10px 14px;margin:12px 0;font-size:14px}
-  details.finding{border:1px solid var(--border);border-radius:8px;margin:8px 0;padding:10px 14px;background:var(--bg)}
-  details.finding summary{cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
-  .badge{color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;text-transform:uppercase}
-  .cwe{color:var(--acc);font-size:12px}code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:12px}
-  pre.ev{background:#0a0e14;border:1px solid var(--border);border-radius:6px;padding:8px;overflow:auto;color:#ffa198;font-size:12px}
-  pre.patch{background:#0a0e14;border:1px solid #238636;border-radius:6px;padding:8px;overflow:auto;color:#a5d6a7;font-size:12px;white-space:pre-wrap}
-  .rem h4{margin:10px 0 4px;font-size:13px}.rem ol,.rem ul{margin:4px 0 8px 18px;font-size:13px;color:#c9d1d9}
-  table{border-collapse:collapse;width:100%;font-size:12.5px}td,th{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}th{background:var(--bg)}
-  .chg{border-radius:8px;padding:1px 8px;font-size:11px}.chg.auto{background:#123a1d;color:#46a758}.chg.review{background:#3a2d12;color:#ffc53d}.chg.manual{background:#3a1d1d;color:#e5484d}
-  pre.diff{background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:12px;line-height:1.45}
-  pre.diff .add{color:#3fb950}pre.diff .del{color:#f85149}pre.diff .hdr{color:#58a6ff}pre.diff .ctx{color:#8b949e}
-  #log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:10px;max-height:180px;overflow:auto;white-space:pre-wrap}
-  .steps{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
-  .step{border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--muted)}
-  .step.done{border-color:var(--low);color:var(--low)}
-  .step.run{border-color:var(--acc);color:var(--acc)}
-  .muted{color:var(--muted);font-size:12px}a{color:var(--acc)}
-  #recdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e5484d;margin-right:6px;vertical-align:middle}
+  body{margin:0;font-family:Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--w);color:var(--k)}
+  .mono{font-family:ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace}
+  button{font-family:inherit;color:inherit}
+  a{color:inherit}
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,label:focus-within{outline:4px solid var(--g);outline-offset:3px}
+
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:20px clamp(20px,3vw,40px);border-bottom:2px solid var(--k)}
+  .brand{font-size:22px;font-weight:800;letter-spacing:-0.02em;text-decoration:none}
+  .chips{display:flex;flex-wrap:wrap;gap:12px}
+  .chip{border:2px solid var(--k);padding:8px 14px;font-size:14px;font-weight:500}
+  .tabs{display:flex;flex-wrap:wrap;border-bottom:2px solid var(--k)}
+  .tab{font-size:16px;font-weight:600;padding:16px 28px;min-height:44px;border:0;background:var(--w);cursor:pointer}
+  .tab[aria-current="page"]{background:var(--k);color:var(--w)}
+
+  .shell{display:flex;flex-wrap:wrap;align-items:stretch}
+  .rail{flex:0 1 320px;min-width:260px;border-right:2px solid var(--k);display:flex;flex-direction:column}
+  .railhead{padding:24px;border-bottom:2px solid var(--k);font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  .railbtn{display:flex;gap:16px;align-items:center;width:100%;text-align:left;padding:20px 24px;border:0;border-bottom:2px solid var(--k);cursor:pointer;min-height:44px;background:var(--w)}
+  .railbtn[aria-current="step"]{background:var(--k);color:var(--w)}
+  .railn{font-size:36px;font-weight:800;letter-spacing:-0.04em;line-height:1;min-width:58px}
+  .railt{font-size:20px;font-weight:800;letter-spacing:-0.02em;line-height:1.15;display:block}
+  .rails{font-size:14px;font-weight:500;display:block;margin-top:4px}
+  .railmeta{padding:24px;display:flex;flex-direction:column;gap:16px}
+  .label{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  .label.grey{color:var(--g)}
+  .metav{font-size:16px;font-weight:600}
+
+  .main{flex:999 1 560px;min-width:0;padding:clamp(24px,4vw,56px) clamp(20px,4vw,56px);display:flex;flex-direction:column;gap:40px}
+  .eyebrow{font-size:14px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  h1{margin:0;font-size:clamp(44px,6.5vw,96px);line-height:.95;letter-spacing:-0.045em;font-weight:800}
+  .lead{max-width:720px;font-size:20px;line-height:1.4}
+  .head{display:flex;flex-direction:column;gap:16px}
+  .col{display:flex;flex-direction:column;gap:32px}
+  .h2{font-size:clamp(28px,3vw,44px);font-weight:800;letter-spacing:-0.03em;line-height:1.1}
+  .row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+
+  .tiles{display:flex;flex-wrap:wrap;gap:16px}
+  .tile{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:10px;text-align:left;border:2px solid var(--k);padding:24px;cursor:pointer;min-height:44px;background:var(--w);text-decoration:none}
+  .tile[aria-pressed="true"]{background:var(--k);color:var(--w)}
+  .tile[aria-disabled="true"]{border-style:dashed;border-color:var(--g);color:var(--g);cursor:not-allowed}
+  .tile.slim{flex-basis:140px;padding:20px;gap:8px}
+  .tile b{font-size:22px;font-weight:800;letter-spacing:-0.02em}
+  .tile span{font-size:15px;line-height:1.4}
+  .tile .num{font-size:48px;font-weight:800;letter-spacing:-0.04em;line-height:1}
+  .tile .cap{font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+
+  .btn{font-size:18px;font-weight:600;padding:20px 36px;min-height:44px;cursor:pointer;background:var(--w);color:var(--k);border:2px solid var(--k)}
+  .btn.k{background:var(--k);color:var(--w)}
+  .btn.sm{font-size:14px;padding:10px 14px}
+  .btn[aria-disabled="true"],.btn:disabled{background:var(--w);color:var(--g);border:2px dashed var(--g);cursor:not-allowed}
+  .nav{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;padding-top:32px;border-top:2px solid var(--k)}
+
+  .box{border:2px solid var(--k);overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:15px;line-height:1.35}
+  th{text-align:left;padding:14px 20px;border-bottom:2px solid var(--k);font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+  td{padding:12px 20px;border-bottom:1px solid var(--g);vertical-align:middle}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:#f0f0f0}
+  .rowbtn{background:none;border:0;padding:0;font:inherit;text-align:left;cursor:pointer;font-weight:600}
+
+  .pill{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;min-width:88px;text-align:center}
+  .pill.critical{background:var(--k);color:var(--w);border:2px solid var(--k)}
+  .pill.high{border:3px solid var(--k)}
+  .pill.medium{border:2px dashed var(--g)}
+  .pill.low{border:1px solid var(--g);color:var(--g)}
+  .pill.info{border:1px dotted var(--g);color:var(--g)}
+  .pill.auto{border:1px solid var(--g);min-width:0}
+  .pill.review{border:3px solid var(--k);min-width:0}
+  .pill.manual{background:var(--k);color:var(--w);border:2px solid var(--k);min-width:0}
+
+  .drop{display:block;border:2px dashed var(--k);padding:56px 24px;text-align:center;font-size:18px;font-weight:500;cursor:pointer;background:var(--w);width:100%}
+  .drop.over{background:#f0f0f0}
+  .field{display:flex;flex-direction:column;gap:8px;max-width:640px}
+  .field label{font-size:14px;font-weight:600}
+  .field input{border:2px solid var(--k);padding:14px 16px;font-size:16px;min-height:44px;background:var(--w);color:var(--k)}
+  .err{border:2px solid var(--k);padding:16px 20px;font-size:16px;font-weight:600}
+
+  .stages{flex:1 1 320px;min-width:0;border:2px solid var(--k)}
+  .stage{display:flex;gap:16px;align-items:center;padding:18px 20px;border-bottom:1px solid var(--g)}
+  .badge{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;font-size:15px;font-weight:800;flex:none;border:1px dashed var(--g);color:var(--g)}
+  .badge.done{background:var(--k);color:var(--w);border:2px solid var(--k)}
+  .badge.work{border:3px solid var(--k);color:var(--k)}
+  .stage .sl{flex:1;font-size:16px;font-weight:600;line-height:1.3}
+  .stage .ss{font-size:14px;font-weight:500}
+  .trace{flex:1.2 1 360px;min-width:0;background:var(--k);color:var(--w);padding:24px;display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.5}
+  .trace .label{font-family:Inter,-apple-system,"Segoe UI",sans-serif}
+
+  .master{display:flex;flex-wrap:wrap;border:2px solid var(--k)}
+  .queue{flex:0 1 340px;min-width:260px;border-right:2px solid var(--k);display:flex;flex-direction:column}
+  .qbtn{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--k);padding:18px 20px;cursor:pointer;min-height:44px;background:var(--w)}
+  .qbtn[aria-pressed="true"]{background:var(--k);color:var(--w)}
+  .qbtn[aria-pressed="true"] .pill.critical{background:var(--w);color:var(--k);border-color:var(--w)}
+  .qbtn[aria-pressed="true"] .pill{border-color:var(--w)}
+  .qbtn .qt{font-size:16px;font-weight:600;line-height:1.3}
+  .qbtn .ql{font-size:13px}
+  .detail{flex:999 1 480px;min-width:0;padding:clamp(20px,3vw,40px);display:flex;flex-direction:column;gap:28px}
+  .patch{display:flex;flex-direction:column;overflow-x:auto}
+  .pl{font-size:14px;line-height:1.5;padding:12px 20px;white-space:pre;border:1px solid var(--g)}
+  .pl.add{background:var(--k);color:var(--w);border-color:var(--k)}
+  .code{border:2px solid var(--k);padding:16px 20px;font-size:14px;line-height:1.5;overflow-x:auto;white-space:pre}
+  .list{display:flex;flex-direction:column;border-top:1px solid var(--g)}
+  .li{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid var(--g);font-size:17px;line-height:1.4}
+  .li b{min-width:28px;font-weight:800}
+  .card{border:2px solid var(--k);display:flex;flex-direction:column}
+  .card .ch{padding:16px 24px;border-bottom:2px solid var(--k);font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  .card .ci{display:flex;gap:16px;padding:16px 24px;border-bottom:1px solid var(--g);font-size:16px;line-height:1.4}
+  .card .ci b{min-width:28px;font-weight:800}
+  .card.inv{background:var(--k);color:var(--w)}
+  .card.inv .ch{border-color:var(--w)}
+  .card.inv .ci{border-color:var(--w)}
+  .black{background:var(--k);color:var(--w);padding:clamp(20px,3vw,40px);display:flex;flex-direction:column;gap:16px}
+  .black .big{font-size:clamp(28px,3.6vw,56px);font-weight:800;letter-spacing:-0.04em;line-height:1}
+  .black p{margin:0;max-width:760px;font-size:19px;line-height:1.4}
+  .phases{display:flex;flex-wrap:wrap;border:2px solid var(--k)}
+  .phase{flex:1 1 240px;padding:28px;border-right:2px solid var(--k);border-bottom:2px solid var(--k);margin:0 -2px -2px 0;display:flex;flex-direction:column;gap:14px}
+  .phase .pn{font-size:64px;font-weight:800;letter-spacing:-0.05em;line-height:.9}
+  .phase .pt{font-size:20px;font-weight:600;line-height:1.35}
+  .diff .dl{font-size:13px;line-height:1.5;padding:2px 20px;white-space:pre}
+  .diff .add{background:var(--k);color:var(--w)}
+  .diff .del{border-left:6px solid var(--g)}
+  .diff .hdr{font-weight:500}
+  .diff .ctx{color:var(--g)}
+  .diff .hunk{color:var(--g);border-top:1px solid var(--g);padding-top:8px}
+  .files-actions{display:flex;flex-wrap:wrap;gap:8px}
+  a.tile:focus-visible{outline:4px solid var(--g)}
+  .sr{position:absolute;left:-9999px}
 </style>
 </head>
 <body>
-<header>
-  <h1>🛡 Legacy Sentinel</h1>
-  <div class="badges">
-    <span>Mistral Large 4</span><span>Agents SDK multi-agent</span><span>Voxtral voice</span><span>COBOL · PHP · Python</span><span>Py2→Py3 workflow</span>
-  </div>
-  <div style="margin-left:auto;font-size:12px">
-    <a href="/">🌐 marketing site</a> · <a href="/one-pager.pdf" target="_blank">📄 one-pager</a>
-  </div>
-</header>
-<nav>
-  <button id="tab-scan" class="active" onclick="showTab('scan')">🔍 Security scan</button>
-  <button id="tab-mig" onclick="showTab('mig')">🔄 Python 2 → 3 migration</button>
-</nav>
-<main>
-  <section id="scan" class="panel active">
-    <div class="card">
-      <b>Target codebase</b>
-      <div style="margin:10px 0">
-        <button class="act secondary" onclick="loadSamples('legacy')">Load demo legacy codebase (COBOL+PHP+Py)</button>
-        <label class="act secondary" style="display:inline-block">Upload files<input type="file" id="filepick" multiple style="display:none" onchange="addFiles(this.files)"></label>
-        <select id="engine"><option value="auto">engine: auto</option><option value="sdk">engine: Mistral Agents SDK</option><option value="direct">engine: direct LLM</option><option value="offline">engine: offline rules</option></select>
-        <input type="text" id="pathinput" placeholder="or a codebase path on this machine, e.g. samples" style="width:300px">
-      </div>
-      <div id="drop">…or drag &amp; drop source files here</div>
-      <div class="chips" id="filechips" style="margin-top:10px"></div>
-      <div class="muted" style="margin-top:6px">click a file to analyze it · 👁 preview source · × remove</div>
-      <div style="margin-top:14px">
-        <button class="act" id="scanbtn" onclick="scan()">Scan for vulnerabilities</button>
-        <button class="act secondary" id="micbtn" onclick="toggleMic()"><span id="recdot" style="display:none"></span>Voice command (Voxtral)</button>
-        <button class="act secondary" onclick="speakSummary()">🔊 Play summary</button>
-        <span id="scanstatus" class="muted"></span>
-      </div>
-      <div id="log" style="margin-top:10px;display:none"></div>
-    </div>
-    <div id="scanresults"></div>
-  </section>
+<div id="app"></div>
+<input type="file" id="fp" class="sr" multiple tabindex="-1" aria-hidden="true">
 
-  <section id="mig" class="panel">
-    <div class="card">
-      <b>Python 2 codebase → migration workflow</b>
-      <div style="margin:10px 0">
-        <button class="act secondary" onclick="loadSamples('py2')">Load Python 2 sample codebase</button>
-        <label class="act secondary" style="display:inline-block">Upload .py files<input type="file" id="filepick2" multiple accept=".py" style="display:none" onchange="addFiles2(this.files)"></label>
-        <select id="engine2"><option value="auto">engine: auto</option><option value="direct">engine: Mistral Large 4</option><option value="offline">engine: offline</option></select>
-      </div>
-      <div class="chips" id="filechips2" style="margin-top:10px"></div>
-      <div class="muted" style="margin-top:6px">click a file to run the Py2→Py3 migration on it · 👁 preview source · × remove</div>
-      <div style="margin-top:14px">
-        <button class="act" id="migbtn" onclick="migrate()">Run migration workflow</button>
-        <span id="migstatus" class="muted"></span>
-      </div>
-      <div class="steps" id="steps" style="display:none">
-        <span class="step" id="st1">1 · Detect Py2 constructs</span>
-        <span class="step" id="st2">2 · Agent migration plan</span>
-        <span class="step" id="st3">3 · Automated diff (2to3)</span>
-        <span class="step" id="st4">4 · Report</span>
-      </div>
-    </div>
-    <div id="migresults"></div>
-  </section>
-</main>
-
-<div id="pv" class="modal" onclick="if(event.target===this)this.style.display='none'"><div class="modal-in"><div id="pvhead"></div><pre id="pvbody"></pre></div></div>
 <script>
-const state = {files: [], files2: [], report: null, mig: null, rec: null, chunks: []};
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* ===== Configuration ===== */
+// Flip to true once /api/scan accepts a repository URL on the server
+const FEATURES = { repoUrl: true };
 
-function showTab(t){
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  $('tab-'+t).classList.add('active');
-  $('scan').classList.toggle('active', t==='scan');
-  $('mig').classList.toggle('active', t==='mig');
-}
-async function loadSamples(kind){
-  const r = await fetch('/api/samples?kind='+kind).then(r=>r.json());
-  if(kind==='py2'){ state.files2 = r.files; renderChips2(); } else { state.files = r.files; renderChips(); }
-}
-function renderChips(){
-  $('filechips').innerHTML = state.files.length
-    ? state.files.map((f,i)=>`<span class="chip"><b title="click to analyze this file" onclick="analyzeFile(${i},'files')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files')">×</span></span>`).join('')
-    : '<span class="muted">no files loaded</span>';
-}
-function renderChips2(){
-  $('filechips2').innerHTML = state.files2.length
-    ? state.files2.map((f,i)=>`<span class="chip"><b title="click to run the migration on this file" onclick="analyzeFile(${i},'files2')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files2')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files2')">×</span></span>`).join('')
-    : '<span class="muted">no files loaded</span>';
-}
-function analyzeFile(i, which){
-  if(which === 'files') scanWith([state.files[i]]);
-  else migrateWith([state.files2[i]]);
-}
-function previewFile(i, which){
-  const f = state[which][i]; if(!f) return;
-  $('pvhead').textContent = f.name + '  ·  ' + f.content.length + ' bytes';
-  $('pvbody').textContent = f.content;
-  $('pv').style.display = 'flex';
-}
-function removeFile(i, which){
-  state[which].splice(i, 1);
-  (which === 'files' ? renderChips : renderChips2)();
-}
-function addFiles(fl){ for(const f of fl){ const rd=new FileReader(); rd.onload=()=>{state.files.push({name:f.name, content:rd.result}); renderChips();}; rd.readAsText(f);} }
-function addFiles2(fl){ for(const f of fl){ const rd=new FileReader(); rd.onload=()=>{state.files2.push({name:f.name, content:rd.result}); renderChips2();}; rd.readAsText(f);} }
-const drop = $('drop');
-['dragover','dragenter'].forEach(e=>drop.addEventListener(e, ev=>{ev.preventDefault(); drop.classList.add('over');}));
-['dragleave','drop'].forEach(e=>drop.addEventListener(e, ev=>{ev.preventDefault(); drop.classList.remove('over');}));
-drop.addEventListener('drop', ev=>{ addFiles(ev.dataTransfer.files); });
+const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
+const SEV_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' };
+const SCAN_ENGINES = [
+  ['auto', 'Auto', 'Uses the Agents SDK when an API key is present'],
+  ['sdk', 'Mistral Agents SDK', 'Multi agent review with specialist analysts'],
+  ['direct', 'Direct LLM', 'Structured output pipeline on Mistral Large 4'],
+  ['offline', 'Offline rules', 'Deterministic rules with no key and no network']
+];
+const MIG_ENGINES = [
+  ['auto', 'Auto', 'Uses the migration agent when an API key is present'],
+  ['direct', 'Mistral Large 4', 'Agent plan with structured output'],
+  ['offline', 'Offline', 'Deterministic detector and 2to3 with no key and no network']
+];
+const SCAN_STEPS = [['01', 'Load'], ['02', 'Scan'], ['03', 'Triage'], ['04', 'Remediate'], ['05', 'Report and migrate']];
+const MIG_STEPS = [['01', 'Load'], ['02', 'Run'], ['03', 'Review'], ['04', 'Plan']];
+const SCAN_HEADS = [
+  ['Load the code', 'Choose what to scan and confirm the files before you start'],
+  ['Scan', 'Pick an engine and run the scan, with every stage visible'],
+  ['Triage', 'Every finding ranked by severity, mapped to a CWE and tied to a file and line'],
+  ['Remediate', 'A fix, a patch and a test for each finding'],
+  ['Report and migrate', 'Export the evidence and follow a phased plan to a modern stack']
+];
+const MIG_HEADS = [
+  ['Load the code', 'Choose the Python 2 code to migrate and confirm the files'],
+  ['Run the migration', 'Pick an engine and run the four stage workflow'],
+  ['Review the changes', 'See what needs to change and what the automated diff already changed'],
+  ['Plan the cutover', 'A checklist, a test plan and the risks to manage']
+];
 
-function log(msg){ const l=$('log'); l.style.display='block'; l.textContent += msg+'\n'; l.scrollTop=l.scrollHeight; }
-
-async function scan(){
-  const pathVal = ($('pathinput').value||'').trim();
-  if(state.files.length) return scanWith(state.files);
-  if(!pathVal){ alert('Load/drop files or enter a codebase path first'); return; }
-  return scanWith(null, pathVal);
+/* ===== Helpers ===== */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nodot = s => String(s == null ? '' : s).replace(/\.\s*$/, '');
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  let d;
+  try { d = await r.json(); } catch (e) { throw new Error('The server returned an unreadable response'); }
+  if (!r.ok || (d && d.error)) throw new Error((d && d.error) || ('Request failed with status ' + r.status));
+  return d;
 }
-async function scanWith(files, pathVal){
-  $('scanbtn').disabled = true; $('scanstatus').textContent = 'scanning… (agents working)';
-  $('log').style.display='none'; $('log').textContent='';
-  try{
-    const body = {engine: $('engine').value, path: pathVal || (files && files.length===1 ? files[0].name : 'upload')};
-    if(files) body.files = files;
-    const r = await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)});
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
-    state.report = data;
-    $('scanstatus').textContent = 'done';
-    if(data.trace) data.trace.forEach(t=>log('🤖 '+t));
-    renderScan(data);
-  }catch(e){ $('scanstatus').textContent = 'error: '+e.message; }
-  $('scanbtn').disabled = false;
+const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+/* ===== State ===== */
+const st = {
+  mode: 'scan',
+  health: null,
+  scan: { step: 1, source: 'demo', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null },
+  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null }
+};
+const cur = () => st[st.mode];
+
+/* ===== Rendering ===== */
+function pre(files, S) {
+  const rows = files.map((f, i) => `<tr>
+    <td class="mono">${esc(f.name)}</td>
+    <td>${esc(langOf(f.name))}</td>
+    <td>${f.content.length} B</td>
+    <td><div class="files-actions">
+      <button class="btn sm" data-act="scanfile" data-arg="${i}">${st.mode === 'scan' ? 'Scan this file' : 'Migrate this file'}</button>
+      <button class="btn sm" data-act="preview" data-arg="${i}">Preview</button>
+      <button class="btn sm" data-act="remove" data-arg="${i}">Remove</button>
+    </div></td></tr>`).join('');
+  let preview = '';
+  if (S.preview != null && files[S.preview]) {
+    const f = files[S.preview];
+    preview = `<div class="card"><div class="ch row" style="justify-content:space-between"><span class="mono">${esc(f.name)}, ${f.content.length} bytes</span><button class="btn sm" data-act="closepreview">Close preview</button></div>
+      <div class="mono" style="padding:20px;font-size:13px;line-height:1.5;white-space:pre;overflow-x:auto">${esc(f.content)}</div></div>`;
+  }
+  return `<div class="box"><table style="min-width:760px"><thead><tr><th>File</th><th>Language</th><th>Size</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>${preview}`;
+}
+function langOf(n) {
+  n = String(n).toLowerCase();
+  if (/\.(cbl|cob|cobol|cpy)$/.test(n)) return 'COBOL';
+  if (/\.(php|phtml)$/.test(n)) return 'PHP';
+  if (/\.(py|pyw)$/.test(n)) return 'Python';
+  return 'Unknown';
+}
+function tiles(list, selected, act, opts) {
+  return `<div class="tiles">${list.map(d => {
+    const disabled = d[3];
+    return `<button class="tile" data-act="${act}" data-arg="${d[0]}" aria-pressed="${selected === d[0] ? 'true' : 'false'}" ${disabled ? 'aria-disabled="true"' : ''}><b>${esc(d[1])}</b><span>${esc(d[2])}</span></button>`;
+  }).join('')}</div>`;
+}
+function stageList(labels, S, done) {
+  return `<div class="stages">${labels.map((l, i) => {
+    const cls = done ? 'done' : S.running ? 'work' : '';
+    return `<div class="stage"><span class="badge ${cls}">${i + 1}</span><span class="sl">${esc(l)}</span><span class="ss">${done ? 'Done' : S.running ? 'Working' : 'Waiting'}</span></div>`;
+  }).join('')}</div>`;
+}
+function traceBox(lines, emptyText) {
+  const body = lines.length ? lines.map(t => `<div>${esc('> ' + t)}</div>`).join('') : `<div>${esc(emptyText)}</div>`;
+  return `<div class="trace mono"><div class="label">Agent trace</div>${body}</div>`;
+}
+function gate(goStep, goLabel, text) {
+  return `<div class="box" style="padding:clamp(24px,4vw,48px);display:flex;flex-direction:column;gap:24px">
+    <div class="h2">No results yet</div><div style="max-width:560px;font-size:18px;line-height:1.4">${esc(text)}</div>
+    <div class="row"><button class="btn k" data-act="goto" data-arg="${goStep}">${esc(goLabel)}</button></div></div>`;
+}
+function errBox(S) { return S.error ? `<div class="err" role="alert">${esc(S.error)}</div>` : ''; }
+
+/* ---- Security scan ---- */
+function scanStep1(S) {
+  const src = [
+    ['url', 'GitHub URL', FEATURES.repoUrl ? 'Paste a repository link' : 'Coming soon, needs server support', !FEATURES.repoUrl],
+    ['demo', 'Demo codebase', 'COBOL, PHP and Python samples'],
+    ['upload', 'Upload files', 'Drag and drop or browse'],
+    ['path', 'Local path', 'A folder inside the project']
+  ];
+  let detail = '';
+  if (S.source === 'upload') detail = `<label class="drop" id="drop" for="fp">Drag and drop COBOL, PHP or Python files here</label>`;
+  if (S.source === 'path') detail = `<div class="field"><label for="pathfield">Folder inside the project</label><input id="pathfield" data-bind="path" type="text" placeholder="samples" value="${esc(S.path)}"></div>`;
+  if (S.source === 'url' && FEATURES.repoUrl) detail = `<div class="field"><label for="urlfield">GitHub repository URL</label><input id="urlfield" data-bind="url" type="text" placeholder="https://github.com/your-org/legacy-app" value="${esc(S.url)}"></div>`;
+  const showFiles = S.files.length > 0 && (S.source === 'demo' || S.source === 'upload');
+  return `<div class="col">${tiles(src, S.source, 'source')}${detail}${showFiles ? pre(S.files, S) : ''}</div>`;
+}
+function scanStep2(S) {
+  const done = !!S.report;
+  const labels = ['Collect files and redact secrets', 'Run the deterministic rules',
+    S.engine === 'offline' ? 'Agent review skipped for the offline engine' : S.engine === 'direct' ? 'Direct review with Mistral Large 4' : 'Multi agent review with Mistral Large 4',
+    'Merge and dedupe by file, line and CWE', 'Build the report'];
+  const trace = done ? (S.report.trace || []) : [];
+  const scopeLine = `<div class="row"><div style="font-size:16px;font-weight:600">Scope: ${esc(S.scope || 'all loaded files')}</div>${S.scope ? '<button class="btn sm" data-act="clearscope">Scan all files</button>' : ''}</div>`;
+  const status = S.running ? 'Agents are working, this can take a minute' : done ? 'Done with ' + S.report.findings.length + ' findings' : 'Ready to scan';
+  return `<div class="col">
+    <div style="display:flex;flex-direction:column;gap:12px"><div class="eyebrow">Engine</div>${tiles(SCAN_ENGINES, S.engine, 'engine')}</div>
+    ${scopeLine}
+    <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Scanning' : done ? 'Scan again' : 'Scan for vulnerabilities'}</button><div style="font-size:16px;font-weight:500">${esc(status)}</div></div>
+    ${errBox(S)}
+    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(trace, 'Waiting for a scan')}</div></div>`;
+}
+function sortedFindings(r) {
+  const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  return [...r.findings].sort((a, b) => order[a.severity] - order[b.severity]);
+}
+function counts(r) {
+  const c = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  r.findings.forEach(f => { c[f.severity] = (c[f.severity] || 0) + 1; });
+  return c;
+}
+function cweUrl(cwe) { const n = String(cwe).split('-')[1] || ''; return 'https://cwe.mitre.org/data/definitions/' + encodeURIComponent(n) + '.html'; }
+function scanStep3(S) {
+  const r = S.report, c = counts(r);
+  const fl = [['all', 'All', r.findings.length]].concat(SEVERITIES.map(s => [s, SEV_LABEL[s], c[s]]));
+  const list = sortedFindings(r).filter(f => S.filter === 'all' || f.severity === S.filter);
+  const rows = list.map(f => `<tr class="click"><td><span class="pill ${esc(f.severity)}">${esc(f.severity)}</span></td>
+    <td><button class="rowbtn" data-act="finding" data-arg="${esc(f.id)}">${esc(f.title)}</button></td>
+    <td>${esc(f.cwe)}</td><td class="mono" style="font-size:14px">${esc(f.file)}:${esc(f.line)}</td><td style="font-size:14px">${esc(f.source)}, confidence ${esc(f.confidence)}</td></tr>`).join('');
+  const parts = SEVERITIES.filter(s => c[s]).map(s => c[s] + ' ' + s).join(', ');
+  return `<div class="col"><div style="font-size:18px;font-weight:600">${esc(nodot(r.summary || (r.findings.length + ' findings: ' + parts)))}</div>
+    <div class="tiles">${fl.map(d => `<button class="tile slim" data-act="filter" data-arg="${d[0]}" aria-pressed="${S.filter === d[0] ? 'true' : 'false'}"><span class="num">${d[2]}</span><span class="cap">${esc(d[1])}</span></button>`).join('')}</div>
+    <div class="box"><table style="min-width:780px"><thead><tr><th>Severity</th><th>Finding</th><th>CWE</th><th>Location</th><th>Source</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No findings in this view</td></tr>'}</tbody></table></div></div>`;
+}
+function patchHtml(p) {
+  return `<div class="patch mono">${String(p).split('\n').map(l => `<div class="pl ${l.startsWith('+') ? 'add' : ''}">${esc(l)}</div>`).join('')}</div>`;
+}
+function scanStep4(S) {
+  const r = S.report, list = sortedFindings(r);
+  if (!list.length) return `<div class="box" style="padding:32px;font-size:18px">No findings to remediate</div>`;
+  const rems = {}; r.remediations.forEach(x => { rems[x.finding_id] = x; });
+  const f = list.find(x => x.id === S.sel) || list[0];
+  const rem = rems[f.id];
+  const queue = list.map(x => `<button class="qbtn" data-act="finding" data-arg="${esc(x.id)}" aria-pressed="${x.id === f.id ? 'true' : 'false'}"><span class="pill ${esc(x.severity)}">${esc(x.severity)}</span><span class="qt">${esc(x.title)}</span><span class="ql mono">${esc(x.file)}:${esc(x.line)}</span></button>`).join('');
+  let fix = '<div style="font-size:17px">No remediation was returned for this finding</div>';
+  if (rem) {
+    fix = `<div class="h2" style="font-size:22px;letter-spacing:-0.02em;line-height:1.2">${esc(nodot(rem.summary))}</div>
+      ${rem.steps && rem.steps.length ? `<div class="list">${rem.steps.map((s, i) => `<div class="li"><b>${i + 1}</b><span>${esc(nodot(s))}</span></div>`).join('')}</div>` : ''}
+      ${rem.patch ? `<div style="display:flex;flex-direction:column;gap:10px"><div class="label">Patch</div>${patchHtml(rem.patch)}</div>` : ''}
+      ${rem.tests && rem.tests.length ? `<div style="display:flex;flex-direction:column;gap:10px"><div class="label">Tests</div>${rem.tests.map(t => `<div style="font-size:17px;line-height:1.4">${esc(nodot(t))}</div>`).join('')}</div>` : ''}
+      ${rem.references && rem.references.length ? `<div style="display:flex;flex-direction:column;gap:10px"><div class="label">References</div>${rem.references.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener" style="font-size:15px;word-break:break-all">${esc(u)}</a>`).join('')}</div>` : ''}`;
+  }
+  return `<div class="master"><div class="queue">${queue}</div><div class="detail">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="row" style="gap:12px"><span class="pill ${esc(f.severity)}">${esc(f.severity)}</span><a href="${cweUrl(f.cwe)}" target="_blank" rel="noopener" style="font-size:15px;font-weight:600">${esc(f.cwe)}</a><span class="mono" style="font-size:14px">${esc(f.file)} line ${esc(f.line)}</span></div>
+      <div class="h2">${esc(f.title)}</div><div style="font-size:18px;line-height:1.4">${esc(nodot(f.description))}</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px"><div class="label">Evidence</div><div class="code mono">${esc(f.evidence)}</div></div>
+    <div style="display:flex;flex-direction:column;gap:14px"><div class="label">Recommended fix</div>${fix}</div></div></div>`;
+}
+function exportTiles(kind, fmts) {
+  const desc = { html: 'A shareable report for reviewers', md: 'For pull requests and wikis', json: 'For your own tooling', sarif: 'For code scanning pipelines' };
+  const name = { html: 'HTML', md: 'Markdown', json: 'JSON', sarif: 'SARIF' };
+  return `<div class="tiles">${fmts.map(f => `<a class="tile" href="/api/export?kind=${kind}&fmt=${f}" target="_blank" rel="noopener"><b style="font-size:28px;letter-spacing:-0.03em">${name[f]}</b><span>${desc[f]}</span></a>`).join('')}</div>`;
+}
+function scanStep5(S) {
+  const m = S.report.migration || {};
+  const phases = (m.phases || []).map((p, i) => `<div class="phase"><div class="pn">${i + 1}</div><div class="pt">${esc(nodot(String(p).replace(/^Phase\s*\d+\s*[-:]\s*/i, '')))}</div></div>`).join('');
+  const mods = (m.modules || []).slice().sort((a, b) => a.order - b.order).map(x => `<tr><td>${esc(x.order)}</td><td style="font-weight:600">${esc(x.component)}</td><td>${esc(x.current)}</td><td>${esc(x.target)}</td><td>${esc(x.effort)}</td><td>${esc(cap(x.risk))}</td></tr>`).join('');
+  const qw = (m.quick_wins || []).length ? `<div class="card"><div class="ch">Quick wins to apply immediately</div>${m.quick_wins.map(q => `<div class="ci" style="font-size:18px;font-weight:600">${esc(nodot(q))}</div>`).join('')}</div>` : '';
+  return `<div class="col" style="gap:48px">
+    <div style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">Export the report</div>${exportTiles('scan', ['html', 'md', 'json', 'sarif'])}</div>
+    <div class="black"><div class="label">Migration strategy</div><div class="big">${esc(nodot(m.strategy || 'No strategy returned'))}</div><p>${esc(nodot(m.summary || ''))}</p></div>
+    ${qw}
+    ${phases ? `<div class="phases">${phases}</div>` : ''}
+    ${mods ? `<div class="box"><table style="min-width:760px"><thead><tr><th>#</th><th>Component</th><th>Current</th><th>Target</th><th>Effort</th><th>Risk</th></tr></thead><tbody>${mods}</tbody></table></div>` : ''}</div>`;
+}
+function scanMain(S) {
+  const has = !!S.report;
+  switch (S.step) {
+    case 1: return scanStep1(S);
+    case 2: return scanStep2(S);
+    case 3: return has ? scanStep3(S) : gate(2, 'Go to scan', 'Run a scan in step 02 to unlock triage, remediation and the migration plan');
+    case 4: return has ? scanStep4(S) : gate(2, 'Go to scan', 'Run a scan in step 02 to unlock triage, remediation and the migration plan');
+    default: return has ? scanStep5(S) : gate(2, 'Go to scan', 'Run a scan in step 02 to unlock triage, remediation and the migration plan');
+  }
 }
 
-const SEVC = {critical:'#e5484d',high:'#f76b15',medium:'#ffc53d',low:'#46a758',info:'#6e7681'};
-function renderScan(d){
-  const counts={}; d.findings.forEach(f=>counts[f.severity]=(counts[f.severity]||0)+1);
-  const cards = Object.keys(SEVC).map(s=>`<span class="stat" style="border-color:${SEVC[s]}"><b>${counts[s]||0}</b> ${s}</span>`).join('');
-  const rems = {}; d.remediations.forEach(r=>rems[r.finding_id]=r);
-  const sevOrder = {critical:0,high:1,medium:2,low:3,info:4};
-  const findings = [...d.findings].sort((a,b)=>sevOrder[a.severity]-sevOrder[b.severity]).map(f=>{
-    const r = rems[f.id]; const cweNum = (f.cwe.split('-')[1])||'';
-    return `<details class="finding"><summary>
-      <span class="badge" style="background:${SEVC[f.severity]}">${esc(f.severity)}</span>
-      <b>${esc(f.title)}</b>
-      <a class="cwe" href="https://cwe.mitre.org/data/definitions/${cweNum}.html">${esc(f.cwe)}</a>
-      <code>${esc(f.file)}:${f.line}</code>
-      <span class="muted">${esc(f.source)} · conf ${esc(f.confidence)}</span></summary>
-      <pre class="ev">${esc(f.evidence)}</pre><p style="font-size:13px">${esc(f.description)}</p>
-      ${r?`<div class="rem"><h4>🔧 ${esc(r.summary)}</h4><ol>${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
-      ${r.patch?`<pre class="patch">${esc(r.patch)}</pre>`:''}
-      ${r.tests&&r.tests.length?`<h4>Tests</h4><ul>${r.tests.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}
-      ${r.references&&r.references.length?`<h4>Refs</h4><ul>${r.references.map(u=>`<li><a href="${esc(u)}">${esc(u)}</a></li>`).join('')}</ul>`:''}
-      </div>`:''}
-    </details>`;
+/* ---- Python 2 to 3 migration ---- */
+function migStep1(S) {
+  const src = [['sample', 'Python 2 sample codebase', 'Three legacy Python 2 modules'], ['upload', 'Upload .py files', 'Drag and drop or browse']];
+  const detail = S.source === 'upload' ? `<label class="drop" id="drop" for="fp">Drag and drop Python 2 files here</label>` : '';
+  return `<div class="col">${tiles(src, S.source, 'source')}${detail}${S.files.length ? pre(S.files, S) : ''}</div>`;
+}
+function migStep2(S) {
+  const done = !!S.result;
+  const labels = ['Detect Python 2 constructs', S.engine === 'offline' ? 'Agent plan skipped for the offline engine' : 'Agent migration plan with Mistral Large 4', 'Automated diff with 2to3', 'Build the report'];
+  const scopeLine = `<div class="row"><div style="font-size:16px;font-weight:600">Scope: ${esc(S.scope || 'all loaded files')}</div>${S.scope ? '<button class="btn sm" data-act="clearscope">Migrate all files</button>' : ''}</div>`;
+  const status = S.running ? 'Agents are working, this can take a minute' : done ? 'Done with ' + S.result.plan.items.length + ' changes found' : 'Ready to run';
+  return `<div class="col">
+    <div style="display:flex;flex-direction:column;gap:12px"><div class="eyebrow">Engine</div>${tiles(MIG_ENGINES, S.engine, 'engine')}</div>
+    ${scopeLine}
+    <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Migrating' : done ? 'Run again' : 'Run migration workflow'}</button><div style="font-size:16px;font-weight:500">${esc(status)}</div></div>
+    ${errBox(S)}
+    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(done ? (S.result.trace || []) : [], 'Waiting for a run')}</div></div>`;
+}
+function diffHtml(d) {
+  return String(d).split('\n').filter(l => l.length).map(l => {
+    let c = 'ctx';
+    if (l.startsWith('+++') || l.startsWith('---')) c = 'hdr';
+    else if (l.startsWith('@@')) c = 'hunk';
+    else if (l.startsWith('+')) c = 'add';
+    else if (l.startsWith('-')) c = 'del';
+    return `<div class="dl ${c}">${esc(l)}</div>`;
   }).join('');
-  const m = d.migration;
-  const mods = (m.modules||[]).sort((a,b)=>a.order-b.order).map(x=>`<tr><td>${x.order}</td><td>${esc(x.component)}</td><td>${esc(x.current)}</td><td>${esc(x.target)}</td><td>${esc(x.effort)}</td><td>${esc(x.risk)}</td></tr>`).join('');
-  $('scanresults').innerHTML = `
-    <div class="card">
-      <b>${esc(d.target)}</b> <span class="muted">engine ${esc(d.engine)} · model ${esc(d.model)} · ${d.scanned_files} files · ${esc(d.languages.join(', '))} · ${esc(d.generated_at)}</span>
-      ${d.voice_command?`<div class="voice">🎙 Voxtral heard: “${esc(d.voice_command)}”</div>`:''}
-      <p>${esc(d.summary)}</p>
-      <div class="stats">${cards}</div>
-      <span class="muted">export:</span>
-      <a href="/api/export?kind=scan&fmt=html" target="_blank">HTML</a> ·
-      <a href="/api/export?kind=scan&fmt=md" target="_blank">Markdown</a> ·
-      <a href="/api/export?kind=scan&fmt=json" target="_blank">JSON</a> ·
-      <a href="/api/export?kind=scan&fmt=sarif" target="_blank">SARIF</a>
-    </div>
-    <div class="card"><h3 style="margin-top:0">Findings (${d.findings.length})</h3>${findings||'<p class="muted">No findings 🎉</p>'}</div>
-    <div class="card"><h3 style="margin-top:0">🧭 Migration recommendation</h3>
-      <p style="font-size:13px"><b>Strategy:</b> ${esc(m.strategy)}</p><p style="font-size:13px">${esc(m.summary)}</p>
-      ${m.quick_wins&&m.quick_wins.length?`<b>Quick wins:</b><ul style="font-size:13px">${m.quick_wins.map(q=>`<li>${esc(q)}</li>`).join('')}</ul>`:''}
-      <b>Phases:</b><ol style="font-size:13px">${(m.phases||[]).map(p=>`<li>${esc(p)}</li>`).join('')}</ol>
-      ${mods?`<table><tr><th>#</th><th>Component</th><th>Current</th><th>Target</th><th>Effort</th><th>Risk</th></tr>${mods}</table>`:''}
-    </div>`;
+}
+function migStep3(S) {
+  const r = S.result, items = r.plan.items;
+  const c = { auto: 0, review: 0, manual: 0 };
+  items.forEach(i => { c[i.change] = (c[i.change] || 0) + 1; });
+  const fl = [['all', 'All', items.length], ['auto', 'Auto', c.auto], ['review', 'Review', c.review], ['manual', 'Manual', c.manual]];
+  const human = items.filter(i => i.change !== 'auto');
+  const callout = human.length ? `<div class="black"><div class="label">Needs a human decision</div>
+    ${human.map(i => `<div style="display:flex;flex-direction:column;gap:6px"><div class="mono" style="font-size:14px">${esc(i.file)} line ${esc(i.line)}</div><div style="font-size:20px;font-weight:800;line-height:1.2">${esc(i.title)}</div><div class="mono" style="font-size:14px">${esc(i.evidence)}</div><div style="font-size:16px;line-height:1.4">${esc(nodot(i.explanation))}</div></div>`).join('')}
+    <p>Check each of these by hand, because 2to3 cannot judge the changed behaviour</p></div>` : '';
+  const rows = items.filter(i => S.filter === 'all' || i.change === S.filter).map(i => `<tr>
+    <td class="mono" style="font-size:13px">${esc(i.file)}</td><td>${esc(i.line)}</td><td style="font-weight:600">${esc(i.title)}</td>
+    <td class="mono" style="font-size:13px">${esc(i.rule_id)}</td><td><span class="pill ${esc(i.change)}">${esc(i.change)}</span></td>
+    <td class="mono" style="font-size:13px">${esc(i.after)}</td><td>${esc(nodot(i.explanation))}</td></tr>`).join('');
+  const diffs = Object.keys(r.diffs || {}).map(p => `<div class="card"><div class="ch mono" style="font-size:14px;letter-spacing:0;text-transform:none;font-weight:500">${esc(p)}</div><div class="diff mono" style="display:flex;flex-direction:column;overflow-x:auto">${diffHtml(r.diffs[p])}</div></div>`).join('');
+  return `<div class="col" style="gap:40px">
+    <div style="font-size:18px;font-weight:600;line-height:1.4">${esc(nodot(r.summary))}</div>
+    ${callout}
+    <div class="tiles">${fl.map(d => `<button class="tile slim" data-act="filter" data-arg="${d[0]}" aria-pressed="${S.filter === d[0] ? 'true' : 'false'}"><span class="num">${d[2]}</span><span class="cap">${esc(d[1])}</span></button>`).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:16px"><div class="h2">Needs to change</div>
+      <div class="box"><table style="min-width:980px"><thead><tr><th>File</th><th>Line</th><th>Issue</th><th>Rule</th><th>Change</th><th>Fix</th><th>Notes</th></tr></thead><tbody>${rows || '<tr><td colspan="7">No changes in this view</td></tr>'}</tbody></table></div></div>
+    <div style="display:flex;flex-direction:column;gap:16px"><div class="h2">What changed</div><div style="font-size:17px;line-height:1.4">The automated 2to3 diff for each file</div>${diffs || '<div class="box" style="padding:24px;font-size:17px">No mechanical changes were required</div>'}</div></div>`;
+}
+function numbered(arr) { return (arr || []).map((t, i) => `<div class="ci"><b>${i + 1}</b><span>${esc(nodot(t))}</span></div>`).join(''); }
+function migStep4(S) {
+  const p = S.result.plan;
+  return `<div class="col" style="gap:48px">
+    <div class="row" style="align-items:stretch;gap:24px">
+      <div class="card" style="flex:1 1 420px;min-width:0"><div class="ch">Checklist</div>${numbered(p.checklist)}</div>
+      <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:24px">
+        <div class="card"><div class="ch">Test plan</div>${numbered(p.test_plan)}</div>
+        <div class="card inv"><div class="ch">Risks</div>${numbered(p.risks)}</div></div></div>
+    <div style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">Export the report</div>${exportTiles('migrate', ['html', 'md', 'json'])}</div></div>`;
+}
+function migMain(S) {
+  const has = !!S.result;
+  const g = () => gate(2, 'Go to run', 'Run the migration in step 02 to unlock the review and the plan');
+  switch (S.step) {
+    case 1: return migStep1(S);
+    case 2: return migStep2(S);
+    case 3: return has ? migStep3(S) : g();
+    default: return has ? migStep4(S) : g();
+  }
 }
 
-async function toggleMic(){
-  if(state.rec){ state.rec.stop(); return; }
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    const rec = new MediaRecorder(stream);
-    state.chunks = []; state.rec = rec;
-    rec.ondataavailable = e=>state.chunks.push(e.data);
-    rec.onstop = async ()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      $('recdot').style.display='none'; $('micbtn').textContent='🎤 Voice command (Voxtral)';
-      const blob = new Blob(state.chunks, {type: rec.mimeType||'audio/webm'});
-      const buf = await blob.arrayBuffer();
-      let bin=''; const bytes=new Uint8Array(buf);
-      for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
-      $('scanstatus').textContent='transcribing with Voxtral…';
-      const r = await fetch('/api/voice', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({audio_b64: btoa(bin), filename:'cmd.webm', files: state.files, engine: $('engine').value})});
-      const data = await r.json();
-      if(data.error) throw new Error(data.error);
-      state.report = data.report;
-      $('scanstatus').textContent='done — heard: “'+data.transcript+'”';
-      log('🎙 Voxtral: '+data.transcript);
-      (data.report.trace||[]).forEach(t=>log('🤖 '+t));
-      renderScan(data.report);
-    };
-    rec.start();
-    $('recdot').style.display='inline-block'; $('micbtn').textContent='Stop & run';
-  }catch(e){ alert('Mic unavailable: '+e.message+' — you can still scan with files.'); }
+/* ---- Page frame ---- */
+function render() {
+  const S = cur(), isScan = st.mode === 'scan';
+  const steps = isScan ? SCAN_STEPS : MIG_STEPS, heads = isScan ? SCAN_HEADS : MIG_HEADS;
+  const last = steps.length;
+  const h = st.health;
+  const health = h ? `${h.model}, API key ${h.has_api_key ? 'set' : 'not set, offline mode'}, Agents SDK ${h.agents_sdk ? 'ready' : 'not installed'}` : 'Checking server status';
+  const engList = isScan ? SCAN_ENGINES : MIG_ENGINES;
+  const engLabel = engList.filter(d => d[0] === S.engine)[0][1];
+  const target = isScan ? ({ demo: 'Demo codebase', upload: 'Uploaded files', path: 'Local path', url: 'GitHub repository' }[S.source]) : (S.source === 'sample' ? 'Python 2 sample codebase' : 'Uploaded files');
+  const has = isScan ? !!S.report : !!S.result;
+  const found = has ? (isScan ? S.report.findings.length : S.result.plan.items.length) + ' found' : (isScan ? 'Not scanned yet' : 'Not run yet');
+  const fileCount = S.files.length ? S.files.length + ' files loaded' : (isScan && S.source === 'path' && S.path ? 'Folder ' + S.path : 'No files loaded');
+  const rail = steps.map((d, i) => {
+    const n = i + 1, curr = n === S.step;
+    return `<button class="railbtn" data-act="goto" data-arg="${n}" aria-current="${curr ? 'step' : 'false'}"><span class="railn">${d[0]}</span><span><span class="railt">${esc(d[1])}</span><span class="rails">${n < S.step ? 'Done' : curr ? 'In progress' : 'Up next'}</span></span></button>`;
+  }).join('');
+  const nextLabels = isScan ? ['Continue to scan', 'Review findings', 'Start remediation', 'Report and migrate', 'Start a new scan'] : ['Continue to run', 'Review changes', 'Build the plan', 'Start a new migration'];
+  const nextOff = S.step === 2 && !has;
+  const body = isScan ? scanMain(S) : migMain(S);
+  document.getElementById('app').innerHTML = `
+    <div class="topbar"><a class="brand" href="/">Legacy Sentinel</a>
+      <div class="chips"><div class="chip">Target: ${esc(target)}</div><div class="chip">Engine: ${esc(engLabel)}</div><div class="chip">${esc(health)}</div></div></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" data-act="mode" data-arg="scan" aria-current="${isScan ? 'page' : 'false'}">Security scan</button>
+      <button class="tab" data-act="mode" data-arg="mig" aria-current="${isScan ? 'false' : 'page'}">Python 2 to 3 migration</button></div>
+    <div class="shell">
+      <nav class="rail" aria-label="Workflow"><div class="railhead">Workflow</div>${rail}
+        <div class="railmeta"><div><div class="label grey">Files</div><div class="metav">${esc(fileCount)}</div></div><div><div class="label grey">${isScan ? 'Findings' : 'Changes found'}</div><div class="metav">${esc(found)}</div></div></div></nav>
+      <main class="main">
+        <div class="head"><div class="eyebrow">Step ${steps[S.step - 1][0]} of 0${last}</div><h1>${esc(heads[S.step - 1][0])}</h1><div class="lead">${esc(heads[S.step - 1][1])}</div></div>
+        ${body}
+        <div class="nav"><button class="btn" data-act="back" ${S.step === 1 ? 'aria-disabled="true"' : ''}>Back</button><button class="btn k" data-act="next" ${nextOff ? 'aria-disabled="true"' : ''}>${nextLabels[S.step - 1]}</button></div>
+      </main></div>`;
+}
+function rerender() {
+  const a = document.activeElement;
+  const key = a && a.dataset && a.dataset.act ? '[data-act="' + a.dataset.act + '"][data-arg="' + (a.dataset.arg || '') + '"]' : null;
+  const bind = a && a.dataset && a.dataset.bind ? a.dataset.bind : null;
+  const pos = bind ? a.selectionStart : 0;
+  render();
+  if (key) { const el = document.querySelector(key); if (el) el.focus({ preventScroll: true }); }
+  if (bind) { const el = document.querySelector('[data-bind="' + bind + '"]'); if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(pos, pos); } catch (e) {} } }
 }
 
-async function speakSummary(){
-  if(!state.report){ alert('run a scan first'); return; }
-  const r = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({text: 'Summary. '+state.report.summary})});
-  if(!r.ok){ alert('TTS failed: '+(await r.json()).error); return; }
-  const blob = await r.blob();
-  new Audio(URL.createObjectURL(blob)).play();
+/* ===== Actions ===== */
+async function loadSamples(kind) {
+  const S = kind === 'py2' ? st.mig : st.scan;
+  try { const r = await api('/api/samples?kind=' + kind); S.files = r.files || []; S.error = null; }
+  catch (e) { S.error = e.message; }
+  S.scope = null; S.preview = null; rerender();
 }
+async function runScan() {
+  const S = st.scan; if (S.running) return;
+  let files = null, path = 'upload';
+  if (S.scope) { const f = S.files.find(x => x.name === S.scope); if (f) { files = [f]; path = f.name; } }
+  else if (S.source === 'path') { path = S.path.trim(); if (!path) { S.error = 'Enter a folder inside the project first'; return rerender(); } }
+  else if (S.source === 'url') { path = S.url.trim(); if (!path) { S.error = 'Enter a repository URL first'; return rerender(); } }
+  else { if (!S.files.length) { S.error = 'Load or add files first'; return rerender(); } files = S.files; path = files.length === 1 ? files[0].name : 'upload'; }
+  S.running = true; S.error = null; S.report = null; rerender();
+  try {
+    const body = { engine: S.engine, path };
+    if (files) body.files = files;
+    S.report = await post('/api/scan', body); S.sel = null; S.filter = 'all';
+  } catch (e) { S.error = e.message; }
+  S.running = false; rerender();
+}
+async function runMig() {
+  const S = st.mig; if (S.running) return;
+  let files = S.files;
+  if (S.scope) { const f = S.files.find(x => x.name === S.scope); if (f) files = [f]; }
+  if (!files.length) { S.error = 'Load or add Python files first'; return rerender(); }
+  S.running = true; S.error = null; S.result = null; rerender();
+  try {
+    S.result = await post('/api/migrate', { files, path: files.length === 1 ? files[0].name : 'upload', engine: S.engine }); S.filter = 'all';
+  } catch (e) { S.error = e.message; }
+  S.running = false; rerender();
+}
+function readFiles(list) {
+  const S = cur(), accept = st.mode === 'mig' ? /\.py$/i : /\.(cbl|cob|cobol|cpy|php|phtml|py|pyw)$/i;
+  const picks = Array.from(list).filter(f => accept.test(f.name));
+  if (!picks.length) { S.error = st.mode === 'mig' ? 'Add Python files with a .py extension' : 'Add COBOL, PHP or Python files'; return rerender(); }
+  S.error = null;
+  Promise.all(picks.map(f => new Promise(res => { const rd = new FileReader(); rd.onload = () => res({ name: f.name, content: String(rd.result) }); rd.onerror = () => res(null); rd.readAsText(f); })))
+    .then(rs => { rs.filter(Boolean).forEach(f => { S.files = S.files.filter(x => x.name !== f.name).concat([f]); }); rerender(); });
+}
+const ACTIONS = {
+  mode(a) { st.mode = a; rerender(); },
+  goto(a) { cur().step = +a; rerender(); },
+  back() { const S = cur(); if (S.step > 1) S.step--; rerender(); },
+  next() {
+    const S = cur(), isScan = st.mode === 'scan', last = isScan ? 5 : 4, has = isScan ? !!S.report : !!S.result;
+    if (S.step === 2 && !has) return;
+    if (S.step === last) { S.step = 1; S.report = null; S.result = null; S.filter = 'all'; S.scope = null; S.error = null; return rerender(); }
+    S.step++; rerender();
+  },
+  source(a) {
+    const S = cur();
+    if (a === 'url' && !FEATURES.repoUrl) return;
+    S.source = a; S.error = null; S.scope = null; S.preview = null;
+    if (st.mode === 'scan') { if (a === 'demo') return loadSamples('legacy'); if (a === 'upload') S.files = []; }
+    else { if (a === 'sample') return loadSamples('py2'); if (a === 'upload') S.files = []; }
+    rerender();
+  },
+  engine(a) { cur().engine = a; rerender(); },
+  run() { st.mode === 'scan' ? runScan() : runMig(); },
+  filter(a) { cur().filter = a; rerender(); },
+  finding(a) { const S = st.scan; S.sel = a; S.step = 4; rerender(); },
+  scanfile(a) { const S = cur(); const f = S.files[+a]; if (!f) return; S.scope = f.name; S.step = 2; S.report = null; S.result = null; rerender(); },
+  clearscope() { cur().scope = null; rerender(); },
+  preview(a) { cur().preview = +a; rerender(); },
+  closepreview() { cur().preview = null; rerender(); },
+  remove(a) { const S = cur(); const f = S.files[+a]; if (!f) return; S.files.splice(+a, 1); if (S.scope === f.name) S.scope = null; S.preview = null; rerender(); }
+};
 
-async function migrate(){
-  return migrateWith(state.files2.length ? state.files2 : null);
-}
-async function migrateWith(files){
-  $('migbtn').disabled = true; $('migstatus').textContent = 'running workflow…';
-  $('steps').style.display='flex';
-  [['st1',true],['st2',false],['st3',false],['st4',false]].forEach(([id,done])=>{$(id).className='step'+(done?' done':'');});
-  try{
-    const r = await fetch('/api/migrate', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({files, path: files && files.length===1 ? files[0].name : 'samples/python2', engine: $('engine2').value})});
-    const d = await r.json();
-    if(d.error) throw new Error(d.error);
-    state.mig = d;
-    $('st1').className='step done'; $('st3').className='step done';
-    $('st2').className='step '+(d.engine!=='offline'?'done':'run');
-    $('st4').className='step done';
-    $('migstatus').textContent = 'done';
-    renderMig(d);
-  }catch(e){ $('migstatus').textContent='error: '+e.message; }
-  $('migbtn').disabled = false;
-}
-
-function diffHtml(diff){
-  return diff.split('\n').map(l=>{
-    const cls = l.startsWith('+++')||l.startsWith('---') ? 'hdr' : l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : 'ctx';
-    return `<span class="${cls}">${esc(l)}</span>`;
-  }).join('\n');
-}
-function renderMig(d){
-  const items = d.plan.items;
-  const rows = items.map(i=>`<tr><td><code>${esc(i.file)}</code></td><td>${i.line}</td><td>${esc(i.title)}</td><td><code>${esc(i.rule_id)}</code></td>
-    <td><span class="chg ${i.change}">${i.change}</span></td><td><code>${esc(i.after)}</code></td><td class="muted">${esc(i.explanation||'')}</td></tr>`).join('');
-  const diffs = Object.entries(d.diffs).map(([p,dd])=>`<h4><code>${esc(p)}</code></h4><pre class="diff">${diffHtml(dd)}</pre>`).join('');
-  $('migresults').innerHTML = `
-    <div class="card"><b>${esc(d.target)}</b> <span class="muted">engine ${esc(d.engine)} · model ${esc(d.model)} · ${esc(d.generated_at)}</span>
-      <p>${esc(d.summary)}</p>
-      <span class="muted">export:</span> <a href="/api/export?kind=migrate&fmt=html" target="_blank">HTML</a> ·
-      <a href="/api/export?kind=migrate&fmt=md" target="_blank">Markdown</a> ·
-      <a href="/api/export?kind=migrate&fmt=json" target="_blank">JSON</a>
-      ${(d.trace||[]).map(t=>`<div class="muted">🤖 ${esc(t)}</div>`).join('')}
-    </div>
-    <div class="card"><h3 style="margin-top:0">📋 Needs to change (${items.length})</h3>
-      <table><tr><th>File</th><th>Line</th><th>Issue</th><th>Rule</th><th>Change</th><th>Fix</th><th>Notes</th></tr>${rows}</table></div>
-    <div class="card"><h3 style="margin-top:0">✅ What changed (automated diff)</h3>${diffs||'<p class="muted">No mechanical changes required.</p>'}</div>
-    <div class="card"><h3 style="margin-top:0">Checklist</h3><ul style="font-size:13px">${d.plan.checklist.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
-      <h4>Test plan</h4><ul style="font-size:13px">${d.plan.test_plan.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
-      <h4>Risks</h4><ul style="font-size:13px">${d.plan.risks.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></div>`;
-}
-
-fetch('/api/health').then(r=>r.json()).then(h=>{
-  document.querySelector('.badges').insertAdjacentHTML('beforeend',
-    `<span>model ${esc(h.model)}</span><span>${h.has_api_key?'🔑 API key set':'⚠ no API key (offline mode)'}</span><span>${h.agents_sdk?'agents-sdk ✓':'agents-sdk ✗'}</span>`);
+/* ===== Events ===== */
+const app = document.getElementById('app');
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.getAttribute('aria-disabled') === 'true' || el.disabled) return;
+  const fn = ACTIONS[el.dataset.act];
+  if (fn) fn(el.dataset.arg);
 });
+app.addEventListener('input', e => {
+  const b = e.target.dataset && e.target.dataset.bind;
+  if (b) cur()[b] = e.target.value;
+});
+app.addEventListener('dragover', e => { const d = e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('over'); } });
+app.addEventListener('dragleave', e => { const d = e.target.closest('#drop'); if (d) d.classList.remove('over'); });
+app.addEventListener('drop', e => { const d = e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.remove('over'); readFiles(e.dataTransfer.files); } });
+document.getElementById('fp').addEventListener('change', e => { readFiles(e.target.files); e.target.value = ''; });
+
+/* ===== Start ===== */
+render();
+api('/api/health').then(h => { st.health = h; rerender(); }).catch(() => { st.health = null; });
+loadSamples('legacy');
+loadSamples('py2');
 </script>
 </body>
 </html>
