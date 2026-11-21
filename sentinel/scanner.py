@@ -15,6 +15,7 @@ LANG_BY_EXT = {
     ".py": "python", ".pyw": "python",
 }
 IGNORE_DIRS = {".git", ".hg", ".svn", "node_modules", "vendor", "__pycache__", ".venv", "venv", "dist", "build", "target", ".idea", ".vscode"}
+REPO_SKIP_DIRS = {"samples", "examples", "fixtures", "doc", "docs", "test", "tests"}
 IGNORE_FILES = {".sentinelignore"}
 MAX_FILE_BYTES = 300_000
 MAX_FILES = 300
@@ -25,8 +26,26 @@ def _lang_for(name: str) -> str | None:
     return LANG_BY_EXT.get(Path(name).suffix.lower())
 
 
-def collect_from_path(root: str | Path) -> list[dict]:
+def parse_langs(arg: str | None) -> set[str] | None:
+    if not arg:
+        return None
+    valid = set(LANG_BY_EXT.values())
+    langs = {x.strip().lower() for x in arg.split(",") if x.strip()}
+    bad = langs - valid
+    if bad:
+        raise SystemExit(f"unknown language(s): {', '.join(sorted(bad))} (choose from: {', '.join(sorted(valid))})")
+    return langs
+
+
+def filter_langs(files: list[dict], langs: set[str] | None) -> list[dict]:
+    if not langs:
+        return files
+    return [f for f in files if f["lang"] in langs]
+
+
+def collect_from_path(root: str | Path, skip_dirs: set[str] | None = None) -> list[dict]:
     root = Path(root)
+    skip = IGNORE_DIRS | set(skip_dirs or ())
     files = []
     if root.is_file():
         candidates = [root]
@@ -34,7 +53,7 @@ def collect_from_path(root: str | Path) -> list[dict]:
         candidates = sorted(p for p in root.rglob("*") if p.is_file())
     for p in candidates:
         rel = str(p.relative_to(root)) if root.is_dir() else p.name
-        if any(part in IGNORE_DIRS for part in p.parts):
+        if any(part in skip for part in Path(rel).parts):
             continue
         if p.name in IGNORE_FILES or p.suffix.lower() in (".min.js", ".lock", ".sum"):
             continue

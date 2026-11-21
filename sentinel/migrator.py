@@ -57,7 +57,7 @@ def _render_md(data: dict) -> str:
     return "\n".join(L) + "\n"
 
 
-def run_report_migration(target: str, report_path: str, out_dir: str, engine: str = "auto", log=print) -> dict:
+def run_report_migration(target: str, report_path: str, out_dir: str, engine: str = "auto", langs: set[str] | None = None, log=print) -> dict:
     key = os.environ.get("MISTRAL_API_KEY", "")
     if not key:
         raise SystemExit("report-driven migration needs MISTRAL_API_KEY (Mistral Large 4 generates the migrated code)")
@@ -66,7 +66,9 @@ def run_report_migration(target: str, report_path: str, out_dir: str, engine: st
     out.mkdir(parents=True, exist_ok=True)
     path, cleanup = fetch.resolve_target(target)
     try:
-        files = scanner.collect_from_path(path)
+        skip = scanner.REPO_SKIP_DIRS if fetch.is_repo_url(target) else None
+        files = scanner.collect_from_path(path, skip_dirs=skip)
+        files = scanner.filter_langs(files, langs)
         if not files:
             raise SystemExit("no supported files found in target (cobol/php/python)")
         client = Mistral(api_key=key, server_url=prompts.API_URL)

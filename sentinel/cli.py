@@ -50,7 +50,9 @@ def cmd_scan(a) -> None:
         sys.exit(2)
     path, cleanup = fetch.resolve_target(target)
     try:
-        files = scanner.collect_from_path(path)
+        skip = scanner.REPO_SKIP_DIRS if fetch.is_repo_url(target) else None
+        files = scanner.collect_from_path(path, skip_dirs=skip)
+        files = scanner.filter_langs(files, scanner.parse_langs(getattr(a, "lang", None)))
         if not files:
             print("no supported files found (cobol/php/python)")
             sys.exit(2)
@@ -74,9 +76,10 @@ def cmd_migrate(a) -> None:
         print("usage: sentinel migrate <path-or-repo-url> [--dir PATH] [--report report.json] [--out DIR]")
         sys.exit(2)
     if getattr(a, "report", None):
-        from . import migrator
+        from . import migrator, scanner
         out = a.out or str(ROOT / "reports" / "migration")
-        res = migrator.run_report_migration(target, a.report, out, engine=a.engine, log=print)
+        langs = scanner.parse_langs(getattr(a, "lang", None))
+        res = migrator.run_report_migration(target, a.report, out, engine=a.engine, langs=langs, log=print)
         b = ", ".join(f"{v} {k}" for k, v in res["findings_before"].items()) or "none"
         af = ", ".join(f"{v} {k}" for k, v in res["findings_after"].items()) or "none"
         print(f"\n=== Report-driven migration: {res['target']} ===")
@@ -97,7 +100,9 @@ def cmd_migrate(a) -> None:
     from . import migrate, scanner
     path, cleanup = fetch.resolve_target(target)
     try:
-        files = scanner.collect_from_path(path)
+        skip = scanner.REPO_SKIP_DIRS if fetch.is_repo_url(target) else None
+        files = scanner.collect_from_path(path, skip_dirs=skip)
+        files = scanner.filter_langs(files, scanner.parse_langs(getattr(a, "lang", None)))
         if not files:
             print("no python files found")
             sys.exit(2)
@@ -171,6 +176,7 @@ def main(argv=None) -> None:
     s = sub.add_parser("scan", help="scan a local path or a GitHub repo URL (default subcommand)")
     s.add_argument("path", nargs="?", default=None, help="local path or repo URL, e.g. https://github.com/owner/repo")
     s.add_argument("--dir", dest="dir", default=None, help="directory containing files (alternative to the positional path)")
+    s.add_argument("--lang", default=None, help="comma-separated languages to include, e.g. --lang python (default: all found; repo-URL scans skip samples/tests/docs dirs)")
     s.add_argument("--engine", default="auto", choices=["auto", "sdk", "direct", "offline"])
     s.add_argument("--out", default=None)
     s.set_defaults(fn=cmd_scan)
@@ -184,6 +190,7 @@ def main(argv=None) -> None:
     m.add_argument("path", nargs="?", default=None, help="local path or repo URL of the code to migrate")
     m.add_argument("--dir", dest="dir", default=None, help="directory containing files (alternative to the positional path)")
     m.add_argument("--report", default=None, help="scan report.json to drive the migration, then re-scan the migrated output")
+    m.add_argument("--lang", default=None, help="comma-separated languages to include, e.g. --lang python (default: all found)")
     m.add_argument("--engine", default="auto", choices=["auto", "direct", "offline"])
     m.add_argument("--out", default=None, help="output dir for migrated code + reports (default reports/migration)")
     m.set_defaults(fn=cmd_migrate)

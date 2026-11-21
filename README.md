@@ -33,9 +33,11 @@ Engines: `auto` (Agents SDK if a key is present) → `sdk` (Mistral Agents SDK m
 ## CLI
 
 ```bash
-python3 -m sentinel scan <path-or-repo-url> [--engine auto|sdk|direct|offline] [--out DIR]   # local path or GitHub URL (shallow clone)
+python3 -m sentinel scan <path-or-repo-url> [--lang python] [--engine auto|sdk|direct|offline] [--out DIR]   # local path or GitHub URL (shallow clone)
 python3 -m sentinel <repo-url>                          # shorthand: scan a GitHub repo URL
-python3 -m sentinel --dir <path>                        # shorthand: scan a local directory
+python3 -m sentinel --dir <path> [--lang python,php]     # shorthand: scan a local directory
+
+Repo-URL scans skip non-core dirs (`samples/`, `examples/`, `fixtures/`, `docs/`, `test(s)/`) so only real code is analyzed; `--lang` restricts languages (cobol/php/python). Point at a local path (e.g. `samples/`) to scan fixtures explicitly.
 python3 -m sentinel migrate <path> [--out DIR]                 # Py2→Py3 workflow
 python3 -m sentinel migrate <path-or-repo-url> --report <scan>/report.json --out <dir>   # report-driven migration: mistral-large-4 rewrites the code per the vuln report, then re-scans the migrated output (before/after findings in <dir>/migration.json + <dir>/rescan/)
 python3 -m sentinel serve --host 127.0.0.1 --port 8000
