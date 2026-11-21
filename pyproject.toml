@@ -1,0 +1,14 @@
+[project]
+name = "legacy-sentinel"
+version = "0.1.0"
+description = "Agentic legacy-code security scanner & migration advisor (COBOL/PHP/Python) — Mistral Large 4 + Agents SDK + Voxtral"
+requires-python = ">=3.12"
+dependencies = [
+    "mistralai>=3.0",
+    "mistralai-agents>=1.1.2,<1.2",
+    "httpx>=0.27",
+    "pydantic>=2",
+]
+
+[project.scripts]
+sentinel = "sentinel.cli:main"
