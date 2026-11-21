@@ -221,3 +221,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# legacy-sentinel
+.env
+reports/
+__pycache__/
+*.pyc
