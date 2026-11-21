@@ -210,8 +210,8 @@ const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type'
 const st = {
   mode: 'scan',
   health: null,
-  scan: { step: 1, source: 'demo', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null },
-  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null }
+  scan: { step: 1, source: 'demo', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobResult: null },
+  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobResult: null }
 };
 const cur = () => st[st.mode];
 
@@ -248,9 +248,18 @@ function tiles(list, selected, act, opts) {
   }).join('')}</div>`;
 }
 function stageList(labels, S, done) {
-  return `<div class="stages">${labels.map((l, i) => {
-    const cls = done ? 'done' : S.running ? 'work' : '';
-    return `<div class="stage"><span class="badge ${cls}">${i + 1}</span><span class="sl">${esc(l)}</span><span class="ss">${done ? 'Done' : S.running ? 'Working' : 'Waiting'}</span></div>`;
+  let steps;
+  if (S.jobSteps && S.jobSteps.length === labels.length) {
+    steps = S.jobSteps;
+  } else {
+    const firstOpen = done || !S.running ? labels.length : 0;
+    steps = labels.map((l, i) => ({ label: l, state: done ? 'done' : i === firstOpen ? 'working' : 'pending', detail: '' }));
+  }
+  return `<div class="stages">${steps.map((stp, i) => {
+    const state = stp.state || 'pending';
+    const cls = state === 'done' ? 'done' : state === 'working' ? 'work' : '';
+    const label = labels[i] || stp.label;
+    return `<div class="stage"><span class="badge ${cls}">${state === 'done' ? '✓' : i + 1}</span><span class="sl">${esc(label)}</span><span class="ss">${state === 'done' ? 'Done' : state === 'working' ? 'Working' : 'Waiting'}${stp.detail ? ' · ' + esc(stp.detail) : ''}</span></div>`;
   }).join('')}</div>`;
 }
 function traceBox(lines, emptyText) {
@@ -291,7 +300,7 @@ function scanStep2(S) {
   const labels = ['Collect files and redact secrets', 'Run the deterministic rules',
     S.engine === 'offline' ? 'Agent review skipped for the offline engine' : S.engine === 'direct' ? 'Direct review with Mistral Large 4' : 'Multi agent review with Mistral Large 4',
     'Merge and dedupe by file, line and CWE', 'Build the report'];
-  const trace = done ? (S.report.trace || []) : [];
+  const trace = done ? (S.report.trace || []) : (S.jobTrace || []);
   const scopeLine = `<div class="row"><div style="font-size:16px;font-weight:600">Scope: ${esc(S.scope || 'all loaded files')}</div>${S.scope ? '<button class="btn sm" data-act="clearscope">Scan all files</button>' : ''}</div>`;
   const status = S.running ? 'Agents are working, this can take a minute' : done ? 'Done with ' + S.report.findings.length + ' findings' : 'Ready to scan';
   return `<div class="col">
@@ -394,7 +403,7 @@ function migStep2(S) {
     <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Migrating' : done ? 'Run again' : 'Run migration workflow'}</button><div style="font-size:16px;font-weight:500">${esc(status)}${S.running ? '<span class="ls-dots" aria-hidden="true"></span>' : ''}</div></div>
     ${S.running ? workPanel('Running the migration workflow' + (S.engine === 'offline' ? ' with the offline detector and 2to3' : ' with the Mistral Large 4 migration agent')) : ''}
     ${errBox(S)}
-    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(done ? (S.result.trace || []) : [], 'Waiting for a run')}</div></div>`;
+    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(done ? (S.result.trace || []) : (S.jobTrace || []), 'Waiting for a run')}</div></div>`;
 }
 function diffHtml(d) {
   return String(d).split('\n').filter(l => l.length).map(l => {
@@ -509,22 +518,36 @@ async function runScan() {
   else if (S.source === 'path') { path = S.path.trim(); if (!path) { S.error = 'Enter a folder inside the project first'; return rerender(); } }
   else if (S.source === 'url') { path = S.url.trim(); if (!path) { S.error = 'Enter a repository URL first'; return rerender(); } }
   else { if (!S.files.length) { S.error = 'Load or add files first'; return rerender(); } files = S.files; path = files.length === 1 ? files[0].name : 'upload'; }
-  S.running = true; S.error = null; S.report = null; rerender();
+  S.running = true; S.error = null; S.report = null; S.job = null; S.jobSteps = null; S.jobTrace = null; S.jobResult = null; rerender();
   try {
     const body = { engine: S.engine, path };
     if (files) body.files = files;
-    S.report = await post('/api/scan', body); S.sel = null; S.filter = 'all';
+    const r = await post('/api/scan', body); S.job = r.job_id; await pollJob(S);
+    if (S.jobResult) { S.report = S.jobResult; S.sel = null; S.filter = 'all'; }
   } catch (e) { S.error = e.message; }
   S.running = false; rerender();
+}
+async function pollJob(S) {
+  while (S.running && S.job) {
+    await new Promise(r => setTimeout(r, 700));
+    let j;
+    try { j = await api('/api/jobs/' + S.job); } catch (e) { continue; }
+    S.jobSteps = j.steps || S.jobSteps; S.jobTrace = j.trace || S.jobTrace;
+    if (j.status === 'done') { S.jobResult = j.result; S.running = false; rerender(); return; }
+    if (j.status === 'error') { S.error = j.error || 'Job failed'; S.running = false; rerender(); return; }
+    rerender();
+  }
 }
 async function runMig() {
   const S = st.mig; if (S.running) return;
   let files = S.files;
   if (S.scope) { const f = S.files.find(x => x.name === S.scope); if (f) files = [f]; }
   if (!files.length) { S.error = 'Load or add Python files first'; return rerender(); }
-  S.running = true; S.error = null; S.result = null; rerender();
+  S.running = true; S.error = null; S.result = null; S.job = null; S.jobSteps = null; S.jobTrace = null; S.jobResult = null; rerender();
   try {
-    S.result = await post('/api/migrate', { files, path: files.length === 1 ? files[0].name : 'upload', engine: S.engine }); S.filter = 'all';
+    const r = await post('/api/migrate', { files, path: files.length === 1 ? files[0].name : 'upload', engine: S.engine });
+    S.job = r.job_id; await pollJob(S);
+    if (S.jobResult) { S.result = S.jobResult; S.filter = 'all'; }
   } catch (e) { S.error = e.message; }
   S.running = false; rerender();
 }

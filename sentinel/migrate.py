@@ -181,29 +181,50 @@ def deterministic_plan(issues: list[dict]) -> dict:
     }
 
 
-def run_migration(target: str, files: list[dict], engine: str = "auto", out_dir: str | None = None, log=print) -> dict:
+def run_migration(target: str, files: list[dict], engine: str = "auto", out_dir: str | None = None, log=print, progress=None) -> dict:
+    def step(i: int, state: str, detail: str = "") -> None:
+        if progress:
+            try:
+                progress({"type": "step", "index": i, "state": state, "detail": detail})
+            except Exception:
+                pass
+
+    def plog(msg) -> None:
+        log(msg)
+        if progress:
+            try:
+                progress({"type": "trace", "line": str(msg)})
+            except Exception:
+                pass
+
     py_files = [f for f in files if f["lang"] == "python"]
+    step(0, "working", "detecting Python 2 constructs")
     issues = detect_py2(files)
-    log(f"  detected {len(issues)} Python 2 constructs")
+    plog(f"detected {len(issues)} Python 2 constructs")
+    step(0, "done", f"{len(issues)} constructs found")
+    step(1, "working", "running lib2to3 for automated diffs")
     diffs = {}
     for f in py_files:
         _, diff = run_2to3(f["path"], f["text"])
         if diff:
             diffs[f["path"]] = diff
-    log(f"  lib2to3 produced diffs for {len(diffs)} file(s)")
+    plog(f"lib2to3 produced diffs for {len(diffs)} file(s)")
+    step(1, "done", f"{len(diffs)} file(s) with automated diffs")
 
     key = os.environ.get("MISTRAL_API_KEY", "")
     trace = []
     plan = None
+    step(2, "working", "building the migration plan")
     if key and engine in ("auto", "direct", "sdk"):
         try:
-            plan = agent_plan(py_files, issues, key, prompts.MODEL, log)
+            plan = agent_plan(py_files, issues, key, prompts.MODEL, plog)
             trace.append(f"migration agent (mistral-large-4, structured output): {len(plan['items'])} planned changes")
         except Exception as e:
-            log(f"  migration agent failed ({e}); using deterministic plan")
+            plog(f"migration agent failed ({e}); using deterministic plan")
     if plan is None:
         plan = deterministic_plan(issues)
         trace.append("deterministic py2 detector + lib2to3 diff (offline)")
+    step(2, "done", f"{len(plan['items'])} planned changes")
 
     seen = {(i["file"], i["line"] // 4, i["rule_id"]) for i in plan["items"]}
     for i in issues:
@@ -216,6 +237,7 @@ def run_migration(target: str, files: list[dict], engine: str = "auto", out_dir:
             })
     plan["items"].sort(key=lambda x: (x["file"], x["line"]))
 
+    step(3, "working", "write report")
     result = {
         "target": target,
         "engine": "mistral-large-4" if key and plan and trace and "migration agent" in trace[0] else "offline",
@@ -230,6 +252,7 @@ def run_migration(target: str, files: list[dict], engine: str = "auto", out_dir:
     }
     if out_dir:
         write_reports(result, out_dir, log)
+    step(3, "done", "report ready")
     return result
 
 

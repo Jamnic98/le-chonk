@@ -26,7 +26,7 @@ def read_source(path: str) -> str:
     return _STATE["store"][path]
 
 
-def run(files: list[dict], api_key: str, model: str, target: str, log=print) -> dict:
+def run(files: list[dict], api_key: str, model: str, target: str, log=print, progress=None, step_index: int = 2) -> dict:
     _STATE["store"] = {f["path"]: f["redacted"] for f in files}
     _STATE["manifest"] = [{"path": f["path"], "language": f["lang"], "chars": len(f["redacted"])} for f in files]
 
@@ -67,11 +67,19 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print) -> 
     def on_event(ev):
         try:
             name = type(ev).__name__
+            line = None
             if name == "ToolCallEntry":
                 tool = getattr(ev, "name", "") or getattr(getattr(ev, "tool_call", None), "name", "")
-                trace.append(f"tool call: {tool}")
+                line = f"tool call: {tool}"
             elif name == "TurnStarted":
-                trace.append("turn started")
+                line = "turn started"
+            elif "Subagent" in name:
+                line = f"subagent event: {name} {getattr(ev, 'name', '')}".strip()
+            if line:
+                trace.append(line)
+                if progress:
+                    progress({"type": "trace", "line": line})
+                    progress({"type": "step", "index": step_index, "state": "working", "detail": line})
         except Exception:
             pass
 

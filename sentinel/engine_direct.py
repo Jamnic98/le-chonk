@@ -49,13 +49,21 @@ def _complete_json(client: Mistral, model: str, system: str, user: str, schema_c
     raise last_err
 
 
-def run(files: list[dict], api_key: str, model: str, target: str, log=print) -> dict:
+def run(files: list[dict], api_key: str, model: str, target: str, log=print, progress=None, step_index: int = 2) -> dict:
+    def pstep(detail: str) -> None:
+        if progress:
+            try:
+                progress({"type": "step", "index": step_index, "state": "working", "detail": detail})
+            except Exception:
+                pass
     client = Mistral(api_key=api_key, server_url=prompts.API_URL)
     langs = sorted({f["lang"] for f in files})
     trace = ["direct engine: mistral-large-4 chat.completions with structured output"]
     findings = []
     for lang in langs:
+        n = sum(1 for f in files if f["lang"] == lang)
         log(f"  analyzing {lang} files with Mistral Large 4 ...")
+        pstep(f"{lang}-analyst reviewing {n} file(s)")
         system = prompts.load_registry_prompt(f"sentinel-analyst-{lang}", {"language": lang, "language_notes": prompts.LANGUAGE_NOTES[lang]}, api_key) or prompts.analyst_prompt(lang)
         out = _complete_json(client, model, system, _payload(files, {lang}), FindingList, "FindingList", log)
         for f in out.findings:
@@ -64,9 +72,11 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print) -> 
     findings.sort(key=lambda x: (x["file"], x["line"]))
     rem_in = json.dumps([{k: f[k] for k in ("id", "rule_id", "title", "cwe", "file", "line", "evidence", "description")} for f in findings])
     log("  remediation agent ...")
+    pstep("remediation agent writing fixes, patches and tests")
     rems = _complete_json(client, model, prompts.REMEDIATION_SYSTEM, rem_in, RemediationList, "RemediationList", log)
     trace.append(f"remediation-agent produced {len(rems.remediations)} remediations")
     log("  migration advisor ...")
+    pstep("migration advisor planning the move to a modern stack")
     mig = _complete_json(
         client, model, prompts.MIGRATION_SYSTEM,
         json.dumps({"manifest": [{"path": f["path"], "language": f["lang"]} for f in files], "findings": findings}),

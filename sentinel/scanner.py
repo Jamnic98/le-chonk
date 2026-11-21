@@ -79,12 +79,28 @@ def _dedupe(baseline: list[dict], llm: list[dict]) -> list[dict]:
 
 
 def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str | None = None,
-             voice_command: str | None = None, log=print) -> dict:
+             voice_command: str | None = None, log=print, progress=None) -> dict:
+    def emit(ev: dict) -> None:
+        if progress:
+            try:
+                progress(ev)
+            except Exception:
+                pass
+
+    def step(i: int, state: str, detail: str = "") -> None:
+        emit({"type": "step", "index": i, "state": state, "detail": detail})
+
+    def plog(msg) -> None:
+        log(msg)
+        emit({"type": "trace", "line": str(msg)})
+
     key = os.environ.get("MISTRAL_API_KEY", "")
     model = prompts.MODEL
+    step(1, "working", "running deterministic rules")
     baseline = []
     for f in files:
         baseline.extend(rules.findings_for_text(f["path"], f["lang"], f["text"]))
+    step(1, "done", f"{len(baseline)} candidate findings")
 
     chosen = engine
     if chosen == "auto":
@@ -97,36 +113,39 @@ def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str 
         else:
             chosen = "offline"
 
+    step(2, "working", f"engine: {chosen}")
     result = None
     if chosen in ("sdk", "direct") and key:
         if chosen == "sdk":
             try:
                 from . import engine_sdk
-                result = engine_sdk.run(files, key, model, target, log)
+                result = engine_sdk.run(files, key, model, target, plog, progress=progress)
             except Exception as e:
-                log(f"  agents-sdk engine failed ({e}); falling back to direct engine")
+                plog(f"agents-sdk engine failed ({e}); falling back to direct engine")
                 result = None
         if result is None:
             try:
-                result = engine_direct.run(files, key, model, target, log)
+                result = engine_direct.run(files, key, model, target, plog, progress=progress)
             except Exception as e:
-                log(f"  direct engine failed ({e}); falling back to offline rules")
+                plog(f"direct engine failed ({e}); falling back to offline rules")
                 result = None
     if result is None:
         chosen = "offline"
-        result = engine_offline.run(files, log)
+        result = engine_offline.run(files, plog)
+    step(2, "done", f"engine {chosen} finished")
 
+    step(3, "working", "merge and dedupe by file, line and CWE")
     findings = _dedupe(baseline, result["findings"]) if chosen != "offline" else result["findings"]
     findings.sort(key=lambda f: (SEVERITY_ORDER.get(f["severity"], 9), f["file"], f["line"]))
-    for i, f in enumerate(findings):
-        f["id"] = f"F{i+1:03d}-" + f["id"].split(":", 1)[-1] if False else f["id"]
 
     have = {r["finding_id"] for r in result["remediations"]}
     remediations = list(result["remediations"])
     for f in findings:
         if f["id"] not in have:
             remediations.append(remediation_for(f))
+    step(3, "done", f"{len(findings)} findings, {len(remediations)} remediations")
 
+    step(4, "working", "build report and write files")
     report = ScanReport(
         target=target,
         engine=result.get("engine", chosen),
@@ -145,4 +164,5 @@ def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str 
     if out_dir:
         from . import report as report_mod
         report_mod.write_all(data, out_dir, log)
+    step(4, "done", "report ready")
     return data
