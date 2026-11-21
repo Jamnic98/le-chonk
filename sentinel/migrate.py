@@ -215,11 +215,21 @@ def run_migration(target: str, files: list[dict], engine: str = "auto", out_dir:
     trace = []
     plan = None
     step(2, "working", "building the migration plan")
+    def aev(name: str, state: str, detail: str = "") -> None:
+        if progress:
+            try:
+                progress({"type": "agent", "name": name, "state": state, "detail": detail})
+            except Exception:
+                pass
+
     if key and engine in ("auto", "direct", "sdk"):
+        aev("migration-agent", "working", "planning changes with mistral-large-4")
         try:
             plan = agent_plan(py_files, issues, key, prompts.MODEL, plog)
+            aev("migration-agent", "done", f"{len(plan['items'])} changes planned")
             trace.append(f"migration agent (mistral-large-4, structured output): {len(plan['items'])} planned changes")
         except Exception as e:
+            aev("migration-agent", "done", "fell back to deterministic plan")
             plog(f"migration agent failed ({e}); using deterministic plan")
     if plan is None:
         plan = deterministic_plan(issues)

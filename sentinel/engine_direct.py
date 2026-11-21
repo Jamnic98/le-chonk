@@ -40,7 +40,6 @@ def _complete_json(client: Mistral, model: str, system: str, user: str, schema_c
             content = resp.choices[0].message.content
             if isinstance(content, list):
                 content = "".join(getattr(c, "text", None) or (c.get("text", "") if isinstance(c, dict) else "") for c in content)
-            log(f"  model call {name}: {resp.usage.prompt_tokens} prompt / {resp.usage.completion_tokens} completion tokens")
             return schema_cls.model_validate(json.loads(content))
         except Exception as e:
             last_err = e
@@ -59,16 +58,29 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
             except Exception:
                 pass
 
+    def aev(name: str, state: str, detail: str = "") -> None:
+        if progress:
+            try:
+                progress({"type": "agent", "name": name, "state": state, "detail": detail})
+            except Exception:
+                pass
+
     client = Mistral(api_key=api_key, server_url=prompts.API_URL)
     n = len(files)
     trace = ["direct engine: mistral-large-4, per-file parallel analysis (" + str(n) + " files, 4 workers)"]
 
     def analyze_one(idx_f):
         i, f = idx_f
+        agent = f"{f['lang']}-analyst · {f['path']}"
         pstep(f"mistral-large-4 analyzing {f['path']} ({i + 1}/{n})")
+        aev(agent, "working", f"file {i + 1}/{n}")
         system = prompts.load_registry_prompt(f"sentinel-analyst-{f['lang']}", {"language": f["lang"], "language_notes": prompts.LANGUAGE_NOTES[f["lang"]]}, api_key) or prompts.analyst_prompt(f["lang"])
-        out = _complete_json(client, model, system, _payload([f]), FindingList, "FindingList", log)
-        return [x.model_dump() | {"source": f"mistral-large-4 ({f['lang']}-analyst)"} for x in out.findings]
+        try:
+            out = _complete_json(client, model, system, _payload([f]), FindingList, "FindingList", log)
+            findings_one = [x.model_dump() | {"source": f"mistral-large-4 ({f['lang']}-analyst)"} for x in out.findings]
+        finally:
+            aev(agent, "done", f"{len(out.findings) if 'out' in dir() else 0} findings")
+        return findings_one
 
     findings = []
     with ThreadPoolExecutor(max_workers=4) as ex:
@@ -82,10 +94,18 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
     mig_in = json.dumps({"manifest": [{"path": f["path"], "language": f["lang"]} for f in files], "findings": findings})
 
     def do_rem():
-        return _complete_json(client, model, prompts.REMEDIATION_SYSTEM, rem_in, RemediationList, "RemediationList", log)
+        aev("remediation-agent", "working", "writing fixes, patches and tests")
+        try:
+            return _complete_json(client, model, prompts.REMEDIATION_SYSTEM, rem_in, RemediationList, "RemediationList", log)
+        finally:
+            aev("remediation-agent", "done")
 
     def do_mig():
-        return _complete_json(client, model, prompts.MIGRATION_SYSTEM, mig_in, MigrationPlan, "MigrationPlan", log)
+        aev("migration-advisor", "working", "planning the move to a modern stack")
+        try:
+            return _complete_json(client, model, prompts.MIGRATION_SYSTEM, mig_in, MigrationPlan, "MigrationPlan", log)
+        finally:
+            aev("migration-advisor", "done")
 
     pstep("remediation agent + migration advisor running in parallel")
     with ThreadPoolExecutor(max_workers=2) as ex:

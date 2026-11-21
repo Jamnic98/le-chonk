@@ -51,6 +51,15 @@ def _progress_cb(jid: str):
                         j["steps"][i]["detail"] = ev["detail"]
             elif ev.get("type") == "trace":
                 j["trace"].append(ev.get("line", ""))
+            elif ev.get("type") == "agent":
+                agents = j.setdefault("agents", [])
+                cur = next((a for a in agents if a["name"] == ev.get("name")), None)
+                if cur:
+                    cur["state"] = ev.get("state", "working")
+                    if ev.get("detail"):
+                        cur["detail"] = ev["detail"]
+                else:
+                    agents.append({"name": ev.get("name", "?"), "state": ev.get("state", "working"), "detail": ev.get("detail", "")})
     return cb
 
 
@@ -176,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not j:
                     self._json({"error": "unknown job"}, 404)
                     return
-                out = {"status": j["status"], "steps": j["steps"], "trace": j["trace"][-300:], "error": j["error"]}
+                out = {"status": j["status"], "steps": j["steps"], "trace": j["trace"][-300:], "agents": j.get("agents", []), "error": j["error"]}
                 if j["status"] == "done":
                     out["result"] = j["result"]
                 self._json(out)

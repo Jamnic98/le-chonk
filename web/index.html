@@ -152,6 +152,14 @@
   @keyframes ls-sweep{0%{top:-4px}100%{top:100%}}
   @keyframes ls-march{to{background-position:28px 0}}
   @keyframes ls-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  .ls-now{font-size:16px;font-weight:700;margin-bottom:2px}
+  .ls-agents{display:flex;flex-direction:column;gap:6px;margin:10px 0 12px;padding:12px 0;border-top:1px solid #444;border-bottom:1px solid #444}
+  .ls-agent{display:flex;align-items:center;gap:10px;font-size:13px}
+  .ls-an{font-weight:600}
+  .ls-as{color:#bbb;margin-left:auto;font-size:12px}
+  .ls-dot{width:10px;height:10px;border-radius:50%;border:1px solid #888;flex:none}
+  .ls-dot.working{background:#fff;border-color:#fff;animation:ls-pulse 1s ease-in-out infinite}
+  .ls-dot.done{background:#fff;border-color:#fff}
   @media (prefers-reduced-motion:reduce){.ls-scanline,.ls-bar-fill,.ls-spin i,.badge.work,.ls-dots::after{animation:none}}
 </style>
 </head>
@@ -210,8 +218,8 @@ const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type'
 const st = {
   mode: 'scan',
   health: null,
-  scan: { step: 1, source: 'demo', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobResult: null },
-  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobResult: null }
+  scan: { step: 1, source: 'url', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null },
+  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null }
 };
 const cur = () => st[st.mode];
 
@@ -262,9 +270,11 @@ function stageList(labels, S, done) {
     return `<div class="stage"><span class="badge ${cls}">${state === 'done' ? '✓' : i + 1}</span><span class="sl">${esc(label)}</span><span class="ss">${state === 'done' ? 'Done' : state === 'working' ? 'Working' : 'Waiting'}${stp.detail ? ' · ' + esc(stp.detail) : ''}</span></div>`;
   }).join('')}</div>`;
 }
-function traceBox(lines, emptyText) {
-  const body = lines.length ? lines.map(t => `<div>${esc('> ' + t)}</div>`).join('') : `<div>${esc(emptyText)}</div>`;
-  return `<div class="trace mono"><div class="label">Agent trace</div>${body}</div>`;
+function traceBox(lines, emptyText, agents, headline) {
+  const hl = headline || emptyText;
+  const ag = (agents && agents.length) ? `<div class="ls-agents">${agents.map(a => `<div class="ls-agent"><span class="ls-dot ${a.state}"></span><span class="ls-an">${esc(a.name)}</span><span class="ls-as">${a.state === 'done' ? 'done' : a.state === 'working' ? 'working' : 'queued'}${a.detail ? ' · ' + esc(a.detail) : ''}</span></div>`).join('')}</div>` : '';
+  const body = lines.length ? lines.map(t => `<div>${esc('> ' + t)}</div>`).join('') : '';
+  return `<div class="trace mono"><div class="label">Agent trace</div><div class="ls-now">▶ ${esc(hl)}</div>${ag}${body}</div>`;
 }
 function gate(goStep, goLabel, text) {
   return `<div class="box" style="padding:clamp(24px,4vw,48px);display:flex;flex-direction:column;gap:24px">
@@ -301,6 +311,7 @@ function scanStep2(S) {
     S.engine === 'offline' ? 'Agent review skipped for the offline engine' : S.engine === 'direct' ? 'Direct review with Mistral Large 4' : 'Multi agent review with Mistral Large 4',
     'Merge and dedupe by file, line and CWE', 'Build the report'];
   const trace = done ? (S.report.trace || []) : (S.jobTrace || []);
+  const hl = S.running ? (((S.jobSteps || []).find(x => x.state === 'working') || {}).detail || 'Agents are working…') : done ? 'Scan complete' : 'Waiting for a scan';
   const scopeLine = `<div class="row"><div style="font-size:16px;font-weight:600">Scope: ${esc(S.scope || 'all loaded files')}</div>${S.scope ? '<button class="btn sm" data-act="clearscope">Scan all files</button>' : ''}</div>`;
   const status = S.running ? 'Agents are working, this can take a minute' : done ? 'Done with ' + S.report.findings.length + ' findings' : 'Ready to scan';
   return `<div class="col">
@@ -309,7 +320,7 @@ function scanStep2(S) {
     <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Scanning' : done ? 'Scan again' : 'Scan for vulnerabilities'}</button><div style="font-size:16px;font-weight:500">${esc(status)}${S.running ? '<span class="ls-dots" aria-hidden="true"></span>' : ''}</div></div>
     ${S.running ? workPanel('Scanning your code' + (S.engine === 'offline' ? ' with the offline rule engine' : ' with Mistral Large 4 agents')) : ''}
     ${errBox(S)}
-    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(trace, 'Waiting for a scan')}</div></div>`;
+    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(trace, 'Waiting for a scan', S.jobAgents || [], hl)}</div></div>`;
 }
 function sortedFindings(r) {
   const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
@@ -397,13 +408,14 @@ function migStep2(S) {
   const labels = ['Detect Python 2 constructs', S.engine === 'offline' ? 'Agent plan skipped for the offline engine' : 'Agent migration plan with Mistral Large 4', 'Automated diff with 2to3', 'Build the report'];
   const scopeLine = `<div class="row"><div style="font-size:16px;font-weight:600">Scope: ${esc(S.scope || 'all loaded files')}</div>${S.scope ? '<button class="btn sm" data-act="clearscope">Migrate all files</button>' : ''}</div>`;
   const status = S.running ? 'Agents are working, this can take a minute' : done ? 'Done with ' + S.result.plan.items.length + ' changes found' : 'Ready to run';
+  const hl = S.running ? (((S.jobSteps || []).find(x => x.state === 'working') || {}).detail || 'Agents are working…') : done ? 'Migration complete' : 'Waiting for a run';
   return `<div class="col">
     <div style="display:flex;flex-direction:column;gap:12px"><div class="eyebrow">Engine</div>${tiles(MIG_ENGINES, S.engine, 'engine')}</div>
     ${scopeLine}
     <div class="row"><button class="btn k" data-act="run" ${S.running ? 'disabled' : ''}>${S.running ? 'Migrating' : done ? 'Run again' : 'Run migration workflow'}</button><div style="font-size:16px;font-weight:500">${esc(status)}${S.running ? '<span class="ls-dots" aria-hidden="true"></span>' : ''}</div></div>
     ${S.running ? workPanel('Running the migration workflow' + (S.engine === 'offline' ? ' with the offline detector and 2to3' : ' with the Mistral Large 4 migration agent')) : ''}
     ${errBox(S)}
-    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(done ? (S.result.trace || []) : (S.jobTrace || []), 'Waiting for a run')}</div></div>`;
+    <div class="row" style="align-items:stretch;gap:24px">${stageList(labels, S, done)}${traceBox(done ? (S.result.trace || []) : (S.jobTrace || []), 'Waiting for a run', S.jobAgents || [], hl)}</div></div>`;
 }
 function diffHtml(d) {
   return String(d).split('\n').filter(l => l.length).map(l => {
@@ -532,7 +544,7 @@ async function pollJob(S) {
     await new Promise(r => setTimeout(r, 700));
     let j;
     try { j = await api('/api/jobs/' + S.job); } catch (e) { continue; }
-    S.jobSteps = j.steps || S.jobSteps; S.jobTrace = j.trace || S.jobTrace;
+    S.jobSteps = j.steps || S.jobSteps; S.jobTrace = (j.trace || S.jobTrace || []).filter(l => !/^model call/.test(l)); S.jobAgents = j.agents || S.jobAgents;
     if (j.status === 'done') { S.jobResult = j.result; S.running = false; rerender(); return; }
     if (j.status === 'error') { S.error = j.error || 'Job failed'; S.running = false; rerender(); return; }
     rerender();

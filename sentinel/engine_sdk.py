@@ -64,6 +64,13 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
 
     trace: list[str] = ["agents-sdk: sentinel-orchestrator (mistral-large-4) with subagents " + ", ".join(s.name for s in subs)]
 
+    def aev(aname: str, state: str, detail: str = "") -> None:
+        if progress:
+            try:
+                progress({"type": "agent", "name": aname, "state": state, "detail": detail})
+            except Exception:
+                pass
+
     def on_event(ev):
         try:
             name = type(ev).__name__
@@ -74,7 +81,10 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
             elif name == "TurnStarted":
                 line = "turn started"
             elif "Subagent" in name:
-                line = f"subagent event: {name} {getattr(ev, 'name', '')}".strip()
+                sub = getattr(ev, "name", "") or getattr(ev, "subagent", "")
+                sub = getattr(sub, "name", sub)
+                line = f"subagent active: {sub}"
+                aev(str(sub), "working", name)
             if line:
                 trace.append(line)
                 if progress:
@@ -103,6 +113,8 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
     for f in result["findings"]:
         f["source"] = f"mistral-large-4 ({f.get('source') or 'agent'})" if not f.get("source", "").startswith("mistral") else f["source"]
     trace.append(f"orchestrator returned {len(result['findings'])} findings, {len(result['remediations'])} remediations")
+    for s in subs:
+        aev(s.name, "done")
     result["trace"] = trace
     result["engine"] = "mistral-agents-sdk"
     result["model"] = model
