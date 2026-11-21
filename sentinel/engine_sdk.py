@@ -87,7 +87,7 @@ def run(files: list[dict], api_key: str, model: str, target: str, log=print, pro
         return await orchestrator.run(prompts.orchestrator_task(target, files), output_type=ScanOutput, on_event=on_event)
 
     log("  starting sentinel-orchestrator + specialist subagents (Mistral Large 4) ...")
-    state = asyncio.run(asyncio.wait_for(go(), timeout=540))
+    state = asyncio.run(asyncio.wait_for(go(), timeout=300))
 
     if isinstance(state, agents.Completed):
         out = state.output

@@ -34,19 +34,23 @@ def _new_job(kind: str, labels: list[str]) -> str:
     return jid
 
 
+_JOBS_LOCK = threading.Lock()
+
+
 def _progress_cb(jid: str):
     def cb(ev: dict) -> None:
-        j = JOBS.get(jid)
-        if not j:
-            return
-        if ev.get("type") == "step":
-            i = ev.get("index", 0)
-            if 0 <= i < len(j["steps"]):
-                j["steps"][i]["state"] = ev.get("state", "working")
-                if ev.get("detail"):
-                    j["steps"][i]["detail"] = ev["detail"]
-        elif ev.get("type") == "trace":
-            j["trace"].append(ev.get("line", ""))
+        with _JOBS_LOCK:
+            j = JOBS.get(jid)
+            if not j:
+                return
+            if ev.get("type") == "step":
+                i = ev.get("index", 0)
+                if 0 <= i < len(j["steps"]):
+                    j["steps"][i]["state"] = ev.get("state", "working")
+                    if ev.get("detail"):
+                        j["steps"][i]["detail"] = ev["detail"]
+            elif ev.get("type") == "trace":
+                j["trace"].append(ev.get("line", ""))
     return cb
 
 

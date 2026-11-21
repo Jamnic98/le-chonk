@@ -98,7 +98,8 @@ def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str 
     model = prompts.MODEL
     step(1, "working", "running deterministic rules")
     baseline = []
-    for f in files:
+    for i, f in enumerate(files):
+        step(1, "working", f"rules scanning {f['path']} ({i + 1}/{len(files)})")
         baseline.extend(rules.findings_for_text(f["path"], f["lang"], f["text"]))
     step(1, "done", f"{len(baseline)} candidate findings")
 
@@ -134,7 +135,7 @@ def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str 
         result = engine_offline.run(files, plog)
     step(2, "done", f"engine {chosen} finished")
 
-    step(3, "working", "merge and dedupe by file, line and CWE")
+    step(3, "working", f"merging and deduping findings across {len(files)} file(s)")
     findings = _dedupe(baseline, result["findings"]) if chosen != "offline" else result["findings"]
     findings.sort(key=lambda f: (SEVERITY_ORDER.get(f["severity"], 9), f["file"], f["line"]))
 
