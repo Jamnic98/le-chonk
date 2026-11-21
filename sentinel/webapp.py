@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -131,6 +132,43 @@ def _safe_path(p: str) -> Path:
 _GH_URL = re.compile(r"^https://(www\.)?github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?(\.git)?$")
 
 
+SAVED = REPORTS / "saved"
+
+
+def _slug(name: str) -> str:
+    s = re.sub(r"[^a-z0-9-_]+", "-", name.lower()).strip("-")
+    return s[:48] or "scan"
+
+
+def _saved_index() -> dict:
+    f = SAVED / "index.json"
+    if f.exists():
+        try:
+            return json.loads(f.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_result(name: str, kind: str) -> dict:
+    src = LAST.get(kind)
+    if not src:
+        raise ValueError(f"no {kind} result to save yet — run one first")
+    SAVED.mkdir(parents=True, exist_ok=True)
+    dest = SAVED / f"{_slug(name)}-{int(time.time())}"
+    shutil.copytree(src, dest)
+    report_file = "report.json" if kind == "scan" else "migration.json"
+    data = json.loads((Path(src) / report_file).read_text(encoding="utf-8"))
+    n_findings = len(data.get("findings", data.get("plan", {}).get("items", [])))
+    entry = {"name": name, "dir": str(dest), "kind": kind, "saved_at": data.get("generated_at", ""),
+             "target": data.get("target", ""), "engine": data.get("engine", ""), "model": data.get("model", ""),
+             "findings": n_findings}
+    idx = _saved_index()
+    idx[name] = entry
+    (SAVED / "index.json").write_text(json.dumps(idx, indent=2), encoding="utf-8")
+    return entry
+
+
 def _clone_and_collect(url: str) -> tuple[list[dict], str]:
     tmp = tempfile.mkdtemp(prefix="sentinel_repo_")
     r = subprocess.run(["git", "clone", "--depth", "1", url, tmp], capture_output=True, timeout=180)
@@ -179,6 +217,21 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/samples":
                 kind = parse_qs(u.query).get("kind", ["legacy"])[0]
                 self._json({"files": _sample_files(kind)})
+            elif u.path == "/api/scans":
+                idx = _saved_index()
+                scans = sorted(idx.values(), key=lambda x: x.get("saved_at", ""), reverse=True)
+                self._json({"scans": scans})
+            elif u.path.startswith("/api/scans/"):
+                name = urlparse(u.path).path.rsplit("/", 1)[-1]
+                from urllib.parse import unquote
+                name = unquote(name)
+                entry = _saved_index().get(name)
+                if not entry:
+                    self._json({"error": "no saved scan with that name"}, 404)
+                    return
+                report_file = "report.json" if entry.get("kind") == "scan" else "migration.json"
+                data = json.loads((Path(entry["dir"]) / report_file).read_text(encoding="utf-8"))
+                self._json({"name": name, "meta": {k: entry.get(k) for k in ("target", "engine", "model", "saved_at", "findings", "kind")}, "report": data})
             elif u.path.startswith("/api/jobs/"):
                 jid = u.path.rsplit("/", 1)[-1]
                 j = JOBS.get(jid)
@@ -235,6 +288,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 wav = voxtral.speak(key, str(body.get("text", ""))[:2000])
                 self._send(wav, "audio/wav")
+            elif p == "/api/scans/save":
+                name = str(body.get("name", "")).strip()
+                if not name:
+                    self._json({"error": "name is required"}, 400)
+                    return
+                kind = "migrate" if body.get("kind") == "migrate" else "scan"
+                entry = _save_result(name, kind)
+                self._json(entry)
             elif p == "/api/migrate":
                 jid = _new_job("migrate", MIG_STEP_LABELS)
                 threading.Thread(target=_run_migrate_job, args=(jid, body), daemon=True).start()

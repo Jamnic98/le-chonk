@@ -202,8 +202,9 @@ const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type'
 const st = {
   mode: 'scan',
   health: null,
-  scan: { step: 1, source: 'url', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null },
-  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null }
+  savedScans: null,
+  scan: { step: 1, source: 'url', files: [], path: '', url: '', engine: 'auto', running: false, report: null, filter: 'all', sel: null, scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null, saveName: '' },
+  mig: { step: 1, source: 'sample', files: [], engine: 'auto', running: false, result: null, filter: 'all', scope: null, preview: null, error: null, job: null, jobSteps: null, jobTrace: null, jobAgents: null, jobResult: null, saveName: '' }
 };
 const cur = () => st[st.mode];
 
@@ -355,7 +356,9 @@ function scanStep5(S) {
   const phases = (m.phases || []).map((p, i) => `<div class="phase"><div class="pn">${i + 1}</div><div class="pt">${esc(nodot(String(p).replace(/^Phase\s*\d+\s*[-:]\s*/i, '')))}</div></div>`).join('');
   const mods = (m.modules || []).slice().sort((a, b) => a.order - b.order).map(x => `<tr><td>${esc(x.order)}</td><td style="font-weight:600">${esc(x.component)}</td><td>${esc(x.current)}</td><td>${esc(x.target)}</td><td>${esc(x.effort)}</td><td>${esc(cap(x.risk))}</td></tr>`).join('');
   const qw = (m.quick_wins || []).length ? `<div class="card"><div class="ch">Quick wins to apply immediately</div>${m.quick_wins.map(q => `<div class="ci" style="font-size:18px;font-weight:600">${esc(nodot(q))}</div>`).join('')}</div>` : '';
-  return `<div class="col" style="gap:48px">
+    const saveBox = `<div class="card"><div class="ch">Save this scan</div><div class="ci"><div class="row" style="flex:1;flex-wrap:wrap"><input data-bind="saveName" type="text" placeholder="Name this scan, e.g. payroll-audit" value="${esc(S.saveName || '')}" style="flex:1;min-width:220px;border:2px solid var(--k);padding:12px 14px;font-size:15px;min-height:44px"><button class="btn k" data-act="savescan">Save</button></div></div></div>`;
+  const savedList = (st.savedScans && st.savedScans.length) ? `<div class="card"><div class="ch">Saved scans</div>${st.savedScans.map(x => `<div class="ci"><button class="rowbtn" data-act="loadscan" data-arg="${esc(x.name)}">${esc(x.name)}</button><span style="margin-left:auto;color:var(--g);font-size:13px">${esc(String(x.target || ''))} · ${x.findings} findings · ${esc(String(x.saved_at || '').slice(0, 16).replace('T', ' '))}</span></div>`).join('')}</div>` : '';
+return `<div class="col" style="gap:48px">
     <div style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">Export the report</div>${exportTiles('scan', ['html', 'md', 'json', 'sarif'])}</div>
     <div class="black"><div class="label">Migration strategy</div><div class="big">${esc(nodot(m.strategy || 'No strategy returned'))}</div><p>${esc(nodot(m.summary || ''))}</p></div>
     ${qw}
@@ -572,7 +575,22 @@ const ACTIONS = {
   clearscope() { cur().scope = null; rerender(); },
   preview(a) { cur().preview = +a; rerender(); },
   closepreview() { cur().preview = null; rerender(); },
-  remove(a) { const S = cur(); const f = S.files[+a]; if (!f) return; S.files.splice(+a, 1); if (S.scope === f.name) S.scope = null; S.preview = null; rerender(); }
+  remove(a) { const S = cur(); const f = S.files[+a]; if (!f) return; S.files.splice(+a, 1); if (S.scope === f.name) S.scope = null; S.preview = null; rerender(); },
+  async savescan() {
+    const S = st.scan;
+    const name = (S.saveName || '').trim() || ('scan-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-'));
+    try {
+      const r = await post('/api/scans/save', { name, kind: 'scan' });
+      st.savedScans = (st.savedScans || []).filter(x => x.name !== r.name).concat([r]);
+      S.saveName = ''; S.error = null; rerender();
+    } catch (e) { S.error = e.message; rerender(); }
+  },
+  async loadscan(a) {
+    try {
+      const r = await api('/api/scans/' + encodeURIComponent(a));
+      st.scan.report = r.report; st.scan.sel = null; st.scan.filter = 'all'; st.scan.step = 3; st.scan.error = null; rerender();
+    } catch (e) { st.scan.error = e.message; rerender(); }
+  }
 };
 
 /* ===== Events ===== */
@@ -595,6 +613,7 @@ document.getElementById('fp').addEventListener('change', e => { readFiles(e.targ
 /* ===== Start ===== */
 render();
 api('/api/health').then(h => { st.health = h; rerender(); }).catch(() => { st.health = null; });
+api('/api/scans').then(r => { st.savedScans = r.scans || []; rerender(); }).catch(() => {});
 loadSamples('legacy');
 loadSamples('py2');
 </script>
