@@ -64,7 +64,6 @@ class ScanOutput(BaseModel):
 
 
 class ScanReport(ScanOutput):
-    voice_command: Optional[str] = None
     trace: list[str] = Field(default_factory=list)
 
 

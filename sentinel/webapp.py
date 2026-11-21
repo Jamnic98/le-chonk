@@ -102,28 +102,10 @@ class Handler(BaseHTTPRequestHandler):
                 files = scanner.collect_from_payload(body["files"]) if body.get("files") else scanner.collect_from_path(_safe_path(body.get("path", "samples")))
                 out = REPORTS / f"web_scan_{int(time.time())}"
                 data = scanner.run_scan(body.get("path", "upload"), files, engine=body.get("engine", "auto"),
-                                        out_dir=str(out), voice_command=body.get("voice_command"), log=_silent)
+                                        out_dir=str(out), log=_silent)
                 LAST["scan"] = str(out)
                 self._json(data)
-            elif p == "/api/voice":
-                if not key:
-                    self._json({"error": "MISTRAL_API_KEY not set on server"}, 400)
-                    return
-                audio = voxtral.b64_to_bytes(body["audio_b64"])
-                t = voxtral.transcribe(key, audio, body.get("filename", "cmd.webm"))
-                intent = voxtral.parse_command(t)
-                files = scanner.collect_from_payload(body["files"]) if body.get("files") else scanner.collect_from_path(SAMPLES)
-                out = REPORTS / f"web_voice_{int(time.time())}"
-                data = scanner.run_scan("voice-command", files, engine=body.get("engine", "auto"),
-                                        out_dir=str(out), voice_command=t, log=_silent)
-                LAST["scan"] = str(out)
-                self._json({"transcript": t, "intent": intent, "report": data})
-            elif p == "/api/speak":
-                if not key:
-                    self._json({"error": "MISTRAL_API_KEY not set on server"}, 400)
-                    return
-                wav = voxtral.speak(key, str(body.get("text", ""))[:2000])
-                self._send(wav, "audio/wav")
+
             elif p == "/api/migrate":
                 files = scanner.collect_from_payload(body["files"]) if body.get("files") else scanner.collect_from_path(_safe_path(body.get("path", "samples/python2")))
                 out = REPORTS / f"web_migrate_{int(time.time())}"

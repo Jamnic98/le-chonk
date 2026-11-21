@@ -32,8 +32,6 @@ def _print_summary(data: dict) -> None:
     print(f"engine={data['engine']}  model={data['model']}  files={data['scanned_files']}  languages={','.join(data['languages'])}")
     print("findings:", ", ".join(f"{v} {k}" for k, v in order) or "none")
     print("summary:", data["summary"])
-    if data.get("voice_command"):
-        print("voice command (Voxtral):", data["voice_command"])
     print("\ntop findings:")
     for f in sorted(data["findings"], key=lambda x: SEVERITY_ORDER.get(x["severity"], 9))[:8]:
         print(f"  [{f['severity']:8}] {f['cwe']} {f['title']} — {f['file']}:{f['line']}")
@@ -122,41 +120,6 @@ def cmd_migrate(a) -> None:
         print("  trace:", t)
 
 
-def cmd_voice(a) -> None:
-    from . import scanner, voxtral
-    key = _key()
-    if not key:
-        print("MISTRAL_API_KEY not set (put it in .env or the environment); cannot transcribe")
-        sys.exit(2)
-    audio = Path(a.audio).read_bytes()
-    t = voxtral.transcribe(key, audio, Path(a.audio).name)
-    print("Voxtral transcript:", t)
-    intent = voxtral.parse_command(t)
-    print("parsed intent:", intent)
-    files = scanner.collect_from_path(a.dir)
-    out = a.out or str(ROOT / "reports" / "voice")
-    data = scanner.run_scan(a.dir, files, engine=a.engine, out_dir=out, voice_command=t, log=print)
-    _print_summary(data)
-    if a.speak_summary:
-        wav = voxtral.speak(key, data["summary"])
-        p = Path(out) / "summary.wav"
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(wav)
-        print("spoken summary (Voxtral TTS):", p)
-
-
-def cmd_make_voice_demo(a) -> None:
-    from . import voxtral
-    key = _key()
-    if not key:
-        print("MISTRAL_API_KEY not set")
-        sys.exit(2)
-    out = Path(a.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(voxtral.speak(key, voxtral.VOICE_DEMO_TEXT))
-    print("wrote", out)
-
-
 def cmd_selftest(a) -> None:
     from . import migrate, scanner
     samples = ROOT / "samples"
@@ -194,7 +157,7 @@ def cmd_serve(a) -> None:
     webapp.serve(a.host, a.port)
 
 
-SUBCOMMANDS = {"scan", "demo", "migrate", "voice", "make-voice-demo", "selftest", "serve"}
+SUBCOMMANDS = {"scan", "demo", "migrate", "selftest", "serve"}
 
 
 def main(argv=None) -> None:
@@ -224,18 +187,6 @@ def main(argv=None) -> None:
     m.add_argument("--engine", default="auto", choices=["auto", "direct", "offline"])
     m.add_argument("--out", default=None, help="output dir for migrated code + reports (default reports/migration)")
     m.set_defaults(fn=cmd_migrate)
-
-    v = sub.add_parser("voice", help="transcribe a voice command with Voxtral and execute it")
-    v.add_argument("audio")
-    v.add_argument("--dir", default=str(ROOT / "samples"))
-    v.add_argument("--engine", default="auto", choices=["auto", "sdk", "direct", "offline"])
-    v.add_argument("--out", default=None)
-    v.add_argument("--speak-summary", action="store_true")
-    v.set_defaults(fn=cmd_voice)
-
-    mv = sub.add_parser("make-voice-demo", help="synthesize the demo voice command with Voxtral TTS")
-    mv.add_argument("--out", default=str(ROOT / "reports" / "voice_command.wav"))
-    mv.set_defaults(fn=cmd_make_voice_demo)
 
     st = sub.add_parser("selftest", help="offline self test (no API key needed)")
     st.set_defaults(fn=cmd_selftest)

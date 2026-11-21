@@ -78,8 +78,7 @@ def _dedupe(baseline: list[dict], llm: list[dict]) -> list[dict]:
     return llm + kept
 
 
-def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str | None = None,
-             voice_command: str | None = None, log=print) -> dict:
+def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str | None = None, log=print) -> dict:
     key = os.environ.get("MISTRAL_API_KEY", "")
     model = prompts.MODEL
     baseline = []
@@ -134,7 +133,6 @@ def run_scan(target: str, files: list[dict], engine: str = "auto", out_dir: str 
         scanned_files=len(files),
         languages=sorted({f["lang"] for f in files}),
         generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        voice_command=voice_command,
         summary=result.get("summary") or engine_offline.compose_summary(findings),
         findings=findings,
         remediations=remediations,

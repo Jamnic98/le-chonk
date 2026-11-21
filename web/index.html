@@ -1,225 +1,716 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Legacy Sentinel — agentic legacy-code security & migration</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--txt:#e6edf3;--muted:#8b949e;--acc:#58a6ff;--crit:#e5484d;--high:#f76b15;--med:#ffc53d;--low:#46a758;--info:#6e7681}
-  *{box-sizing:border-box}
-  body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);margin:0}
-  header{padding:18px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  header h1{font-size:19px;margin:0}
-  .badges span{display:inline-block;border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:11px;color:var(--muted);margin-left:6px}
-  nav{display:flex;gap:8px;padding:10px 28px;border-bottom:1px solid var(--border)}
-  nav button{background:var(--panel);color:var(--txt);border:1px solid var(--border);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px}
-  nav button.active{border-color:var(--acc);color:var(--acc)}
-  main{padding:20px 28px;max-width:1150px}
-  .panel{display:none}.panel.active{display:block}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px}
-  button.act{background:#238636;color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;margin-right:8px}
-  button.act.secondary{background:var(--panel);border:1px solid var(--border);color:var(--txt)}
-  button.act.warn{background:#9e2a2b}
-  button.act:disabled{opacity:.5;cursor:default}
-  select,input[type=file]{background:var(--bg);color:var(--txt);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px}
-  #drop{border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:13px;margin-top:10px}
-  #drop.over{border-color:var(--acc);color:var(--acc)}
-  .chips span{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:11px;margin:2px 4px 2px 0}
-  .chips .chip{display:inline-flex;gap:6px;align-items:center}
-  .chips .chip b{font-weight:600;cursor:pointer;color:var(--acc)}
-  .chips .chip b:hover{text-decoration:underline}
-  .chips .x{cursor:pointer;color:var(--crit);padding:0 5px;border-radius:6px;font-weight:700}
-  .chips .x:hover{background:#3a1d1d}
-  .chips .v{cursor:pointer;padding:0 5px;border-radius:6px}
-  .chips .v:hover{background:#1f2a44}
-  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10;align-items:center;justify-content:center}
-  .modal-in{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:840px;width:92%;max-height:82vh;display:flex;flex-direction:column}
-  #pvhead{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace}
-  #pvbody{margin:0;padding:14px;overflow:auto;font-size:12px;white-space:pre-wrap}
-  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-  .stat{border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px}
-  .voice{background:#1f2a44;border:1px solid #3b5bdb;border-radius:8px;padding:10px 14px;margin:12px 0;font-size:14px}
-  details.finding{border:1px solid var(--border);border-radius:8px;margin:8px 0;padding:10px 14px;background:var(--bg)}
-  details.finding summary{cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
-  .badge{color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;text-transform:uppercase}
-  .cwe{color:var(--acc);font-size:12px}code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:12px}
-  pre.ev{background:#0a0e14;border:1px solid var(--border);border-radius:6px;padding:8px;overflow:auto;color:#ffa198;font-size:12px}
-  pre.patch{background:#0a0e14;border:1px solid #238636;border-radius:6px;padding:8px;overflow:auto;color:#a5d6a7;font-size:12px;white-space:pre-wrap}
-  .rem h4{margin:10px 0 4px;font-size:13px}.rem ol,.rem ul{margin:4px 0 8px 18px;font-size:13px;color:#c9d1d9}
-  table{border-collapse:collapse;width:100%;font-size:12.5px}td,th{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}th{background:var(--bg)}
-  .chg{border-radius:8px;padding:1px 8px;font-size:11px}.chg.auto{background:#123a1d;color:#46a758}.chg.review{background:#3a2d12;color:#ffc53d}.chg.manual{background:#3a1d1d;color:#e5484d}
-  pre.diff{background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:12px;line-height:1.45}
-  pre.diff .add{color:#3fb950}pre.diff .del{color:#f85149}pre.diff .hdr{color:#58a6ff}pre.diff .ctx{color:#8b949e}
-  #log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:10px;max-height:180px;overflow:auto;white-space:pre-wrap}
-  .steps{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
-  .step{border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--muted)}
-  .step.done{border-color:var(--low);color:var(--low)}
-  .step.run{border-color:var(--acc);color:var(--acc)}
-  .muted{color:var(--muted);font-size:12px}a{color:var(--acc)}
-  #recdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e5484d;margin-right:6px;vertical-align:middle}
-</style>
-</head>
-<body>
-<header>
-  <h1>🛡 Legacy Sentinel</h1>
-  <div class="badges">
-    <span>Mistral Large 4</span><span>Agents SDK multi-agent</span><span>Voxtral voice</span><span>COBOL · PHP · Python</span><span>Py2→Py3 workflow</span>
-  </div>
-</header>
-<nav>
-  <button id="tab-scan" class="active" onclick="showTab('scan')">🔍 Security scan</button>
-  <button id="tab-mig" onclick="showTab('mig')">🔄 Python 2 → 3 migration</button>
-</nav>
-<main>
-  <section id="scan" class="panel active">
-    <div class="card">
-      <b>Target codebase</b>
-      <div style="margin:10px 0">
-        <button class="act secondary" onclick="loadSamples('legacy')">Load demo legacy codebase (COBOL+PHP+Py)</button>
-        <label class="act secondary" style="display:inline-block">Upload files<input type="file" id="filepick" multiple style="display:none" onchange="addFiles(this.files)"></label>
-        <select id="engine"><option value="auto">engine: auto</option><option value="sdk">engine: Mistral Agents SDK</option><option value="direct">engine: direct LLM</option><option value="offline">engine: offline rules</option></select>
-        <input type="text" id="pathinput" placeholder="or a codebase path on this machine, e.g. samples" style="width:300px">
+  <head>
+    <meta charset="utf-8" />
+    <title>Legacy Sentinel — agentic legacy-code security & migration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --txt: #e6edf3;
+        --muted: #8b949e;
+        --acc: #58a6ff;
+        --crit: #e5484d;
+        --high: #f76b15;
+        --med: #ffc53d;
+        --low: #46a758;
+        --info: #6e7681;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--txt);
+        margin: 0;
+      }
+      header {
+        padding: 18px 28px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      header h1 {
+        font-size: 19px;
+        margin: 0;
+      }
+      .badges span {
+        display: inline-block;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 2px 10px;
+        font-size: 11px;
+        color: var(--muted);
+        margin-left: 6px;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        padding: 10px 28px;
+        border-bottom: 1px solid var(--border);
+      }
+      nav button {
+        background: var(--panel);
+        color: var(--txt);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      nav button.active {
+        border-color: var(--acc);
+        color: var(--acc);
+      }
+      main {
+        padding: 20px 28px;
+        max-width: 1150px;
+      }
+      .panel {
+        display: none;
+      }
+      .panel.active {
+        display: block;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 14px;
+      }
+      button.act {
+        background: #238636;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 9px 16px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-right: 8px;
+      }
+      button.act.secondary {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        color: var(--txt);
+      }
+      button.act.warn {
+        background: #9e2a2b;
+      }
+      button.act:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      select,
+      input[type="file"] {
+        background: var(--bg);
+        color: var(--txt);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 13px;
+      }
+      #drop {
+        border: 2px dashed var(--border);
+        border-radius: 10px;
+        padding: 22px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      #drop.over {
+        border-color: var(--acc);
+        color: var(--acc);
+      }
+      .chips span {
+        display: inline-block;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 3px 10px;
+        font-size: 11px;
+        margin: 2px 4px 2px 0;
+      }
+      .chips .chip {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .chips .chip b {
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--acc);
+      }
+      .chips .chip b:hover {
+        text-decoration: underline;
+      }
+      .chips .x {
+        cursor: pointer;
+        color: var(--crit);
+        padding: 0 5px;
+        border-radius: 6px;
+        font-weight: 700;
+      }
+      .chips .x:hover {
+        background: #3a1d1d;
+      }
+      .chips .v {
+        cursor: pointer;
+        padding: 0 5px;
+        border-radius: 6px;
+      }
+      .chips .v:hover {
+        background: #1f2a44;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-in {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        max-width: 840px;
+        width: 92%;
+        max-height: 82vh;
+        display: flex;
+        flex-direction: column;
+      }
+      #pvhead {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+      }
+      #pvbody {
+        margin: 0;
+        padding: 14px;
+        overflow: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .stats {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      .stat {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+      }
+      details.finding {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin: 8px 0;
+        padding: 10px 14px;
+        background: var(--bg);
+      }
+      details.finding summary {
+        cursor: pointer;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 14px;
+      }
+      .badge {
+        color: #fff;
+        border-radius: 10px;
+        padding: 2px 10px;
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+      .cwe {
+        color: var(--acc);
+        font-size: 12px;
+      }
+      code {
+        background: var(--panel);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      pre.ev {
+        background: #0a0e14;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        overflow: auto;
+        color: #ffa198;
+        font-size: 12px;
+      }
+      pre.patch {
+        background: #0a0e14;
+        border: 1px solid #238636;
+        border-radius: 6px;
+        padding: 8px;
+        overflow: auto;
+        color: #a5d6a7;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .rem h4 {
+        margin: 10px 0 4px;
+        font-size: 13px;
+      }
+      .rem ol,
+      .rem ul {
+        margin: 4px 0 8px 18px;
+        font-size: 13px;
+        color: #c9d1d9;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12.5px;
+      }
+      td,
+      th {
+        border: 1px solid var(--border);
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--bg);
+      }
+      .chg {
+        border-radius: 8px;
+        padding: 1px 8px;
+        font-size: 11px;
+      }
+      .chg.auto {
+        background: #123a1d;
+        color: #46a758;
+      }
+      .chg.review {
+        background: #3a2d12;
+        color: #ffc53d;
+      }
+      .chg.manual {
+        background: #3a1d1d;
+        color: #e5484d;
+      }
+      pre.diff {
+        background: #0a0e14;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        overflow: auto;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      pre.diff .add {
+        color: #3fb950;
+      }
+      pre.diff .del {
+        color: #f85149;
+      }
+      pre.diff .hdr {
+        color: #58a6ff;
+      }
+      pre.diff .ctx {
+        color: #8b949e;
+      }
+      #log {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: var(--muted);
+        background: #0a0e14;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        max-height: 180px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      .steps {
+        display: flex;
+        gap: 8px;
+        margin: 10px 0;
+        flex-wrap: wrap;
+      }
+      .step {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .step.done {
+        border-color: var(--low);
+        color: var(--low);
+      }
+      .step.run {
+        border-color: var(--acc);
+        color: var(--acc);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      a {
+        color: var(--acc);
+      }
+      #recdot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #e5484d;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🛡 Legacy Sentinel</h1>
+      <div class="badges">
+        <span>Mistral Large 4</span><span>Agents SDK multi-agent</span
+        ><span>COBOL · PHP · Python</span><span>Py2→Py3 workflow</span>
       </div>
-      <div id="drop">…or drag &amp; drop source files here</div>
-      <div class="chips" id="filechips" style="margin-top:10px"></div>
-      <div class="muted" style="margin-top:6px">click a file to analyze it · 👁 preview source · × remove</div>
-      <div style="margin-top:14px">
-        <button class="act" id="scanbtn" onclick="scan()">Scan for vulnerabilities</button>
-        <button class="act secondary" id="micbtn" onclick="toggleMic()"><span id="recdot" style="display:none"></span>Voice command (Voxtral)</button>
-        <button class="act secondary" onclick="speakSummary()">🔊 Play summary</button>
-        <span id="scanstatus" class="muted"></span>
+    </header>
+    <nav>
+      <button id="tab-scan" class="active" onclick="showTab('scan')">
+        🔍 Security scan
+      </button>
+      <button id="tab-mig" onclick="showTab('mig')">
+        🔄 Python 2 → 3 migration
+      </button>
+    </nav>
+    <main>
+      <section id="scan" class="panel active">
+        <div class="card">
+          <b>Target codebase</b>
+          <div style="margin: 10px 0">
+            <button class="act secondary" onclick="loadSamples('legacy')">
+              Load demo legacy codebase (COBOL+PHP+Py)
+            </button>
+            <label class="act secondary" style="display: inline-block"
+              >Upload files<input
+                type="file"
+                id="filepick"
+                multiple
+                style="display: none"
+                onchange="addFiles(this.files)"
+            /></label>
+            <select id="engine">
+              <option value="auto">engine: auto</option>
+              <option value="sdk">engine: Mistral Agents SDK</option>
+              <option value="direct">engine: direct LLM</option>
+              <option value="offline">engine: offline rules</option>
+            </select>
+            <input
+              type="text"
+              id="pathinput"
+              placeholder="or a codebase path on this machine, e.g. samples"
+              style="width: 300px"
+            />
+          </div>
+          <div id="drop">…or drag &amp; drop source files here</div>
+          <div class="chips" id="filechips" style="margin-top: 10px"></div>
+          <div class="muted" style="margin-top: 6px">
+            click a file to analyze it · 👁 preview source · × remove
+          </div>
+          <div style="margin-top: 14px">
+            <button class="act" id="scanbtn" onclick="scan()">
+              Scan for vulnerabilities
+            </button>
+            <span id="scanstatus" class="muted"></span>
+          </div>
+          <div id="log" style="margin-top: 10px; display: none"></div>
+        </div>
+        <div id="scanresults"></div>
+      </section>
+
+      <section id="mig" class="panel">
+        <div class="card">
+          <b>Python 2 codebase → migration workflow</b>
+          <div style="margin: 10px 0">
+            <button class="act secondary" onclick="loadSamples('py2')">
+              Load Python 2 sample codebase
+            </button>
+            <label class="act secondary" style="display: inline-block"
+              >Upload .py files<input
+                type="file"
+                id="filepick2"
+                multiple
+                accept=".py"
+                style="display: none"
+                onchange="addFiles2(this.files)"
+            /></label>
+            <select id="engine2">
+              <option value="auto">engine: auto</option>
+              <option value="direct">engine: Mistral Large 4</option>
+              <option value="offline">engine: offline</option>
+            </select>
+          </div>
+          <div class="chips" id="filechips2" style="margin-top: 10px"></div>
+          <div class="muted" style="margin-top: 6px">
+            click a file to run the Py2→Py3 migration on it · 👁 preview source
+            · × remove
+          </div>
+          <div style="margin-top: 14px">
+            <button class="act" id="migbtn" onclick="migrate()">
+              Run migration workflow
+            </button>
+            <span id="migstatus" class="muted"></span>
+          </div>
+          <div class="steps" id="steps" style="display: none">
+            <span class="step" id="st1">1 · Detect Py2 constructs</span>
+            <span class="step" id="st2">2 · Agent migration plan</span>
+            <span class="step" id="st3">3 · Automated diff (2to3)</span>
+            <span class="step" id="st4">4 · Report</span>
+          </div>
+        </div>
+        <div id="migresults"></div>
+      </section>
+    </main>
+
+    <div
+      id="pv"
+      class="modal"
+      onclick="if (event.target === this) this.style.display = 'none';"
+    >
+      <div class="modal-in">
+        <div id="pvhead"></div>
+        <pre id="pvbody"></pre>
       </div>
-      <div id="log" style="margin-top:10px;display:none"></div>
     </div>
-    <div id="scanresults"></div>
-  </section>
+    <script>
+      const state = {
+        files: [],
+        files2: [],
+        report: null,
+        mig: null,
+        rec: null,
+        chunks: [],
+      };
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
 
-  <section id="mig" class="panel">
-    <div class="card">
-      <b>Python 2 codebase → migration workflow</b>
-      <div style="margin:10px 0">
-        <button class="act secondary" onclick="loadSamples('py2')">Load Python 2 sample codebase</button>
-        <label class="act secondary" style="display:inline-block">Upload .py files<input type="file" id="filepick2" multiple accept=".py" style="display:none" onchange="addFiles2(this.files)"></label>
-        <select id="engine2"><option value="auto">engine: auto</option><option value="direct">engine: Mistral Large 4</option><option value="offline">engine: offline</option></select>
-      </div>
-      <div class="chips" id="filechips2" style="margin-top:10px"></div>
-      <div class="muted" style="margin-top:6px">click a file to run the Py2→Py3 migration on it · 👁 preview source · × remove</div>
-      <div style="margin-top:14px">
-        <button class="act" id="migbtn" onclick="migrate()">Run migration workflow</button>
-        <span id="migstatus" class="muted"></span>
-      </div>
-      <div class="steps" id="steps" style="display:none">
-        <span class="step" id="st1">1 · Detect Py2 constructs</span>
-        <span class="step" id="st2">2 · Agent migration plan</span>
-        <span class="step" id="st3">3 · Automated diff (2to3)</span>
-        <span class="step" id="st4">4 · Report</span>
-      </div>
-    </div>
-    <div id="migresults"></div>
-  </section>
-</main>
+      function showTab(t) {
+        document
+          .querySelectorAll("nav button")
+          .forEach((b) => b.classList.remove("active"));
+        $("tab-" + t).classList.add("active");
+        $("scan").classList.toggle("active", t === "scan");
+        $("mig").classList.toggle("active", t === "mig");
+      }
+      async function loadSamples(kind) {
+        const r = await fetch("/api/samples?kind=" + kind).then((r) =>
+          r.json(),
+        );
+        if (kind === "py2") {
+          state.files2 = r.files;
+          renderChips2();
+        } else {
+          state.files = r.files;
+          renderChips();
+        }
+      }
+      function renderChips() {
+        $("filechips").innerHTML = state.files.length
+          ? state.files
+              .map(
+                (f, i) =>
+                  `<span class="chip"><b title="click to analyze this file" onclick="analyzeFile(${i},'files')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files')">×</span></span>`,
+              )
+              .join("")
+          : '<span class="muted">no files loaded</span>';
+      }
+      function renderChips2() {
+        $("filechips2").innerHTML = state.files2.length
+          ? state.files2
+              .map(
+                (f, i) =>
+                  `<span class="chip"><b title="click to run the migration on this file" onclick="analyzeFile(${i},'files2')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files2')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files2')">×</span></span>`,
+              )
+              .join("")
+          : '<span class="muted">no files loaded</span>';
+      }
+      function analyzeFile(i, which) {
+        if (which === "files") scanWith([state.files[i]]);
+        else migrateWith([state.files2[i]]);
+      }
+      function previewFile(i, which) {
+        const f = state[which][i];
+        if (!f) return;
+        $("pvhead").textContent =
+          f.name + "  ·  " + f.content.length + " bytes";
+        $("pvbody").textContent = f.content;
+        $("pv").style.display = "flex";
+      }
+      function removeFile(i, which) {
+        state[which].splice(i, 1);
+        (which === "files" ? renderChips : renderChips2)();
+      }
+      function addFiles(fl) {
+        for (const f of fl) {
+          const rd = new FileReader();
+          rd.onload = () => {
+            state.files.push({ name: f.name, content: rd.result });
+            renderChips();
+          };
+          rd.readAsText(f);
+        }
+      }
+      function addFiles2(fl) {
+        for (const f of fl) {
+          const rd = new FileReader();
+          rd.onload = () => {
+            state.files2.push({ name: f.name, content: rd.result });
+            renderChips2();
+          };
+          rd.readAsText(f);
+        }
+      }
+      const drop = $("drop");
+      ["dragover", "dragenter"].forEach((e) =>
+        drop.addEventListener(e, (ev) => {
+          ev.preventDefault();
+          drop.classList.add("over");
+        }),
+      );
+      ["dragleave", "drop"].forEach((e) =>
+        drop.addEventListener(e, (ev) => {
+          ev.preventDefault();
+          drop.classList.remove("over");
+        }),
+      );
+      drop.addEventListener("drop", (ev) => {
+        addFiles(ev.dataTransfer.files);
+      });
 
-<div id="pv" class="modal" onclick="if(event.target===this)this.style.display='none'"><div class="modal-in"><div id="pvhead"></div><pre id="pvbody"></pre></div></div>
-<script>
-const state = {files: [], files2: [], report: null, mig: null, rec: null, chunks: []};
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      function log(msg) {
+        const l = $("log");
+        l.style.display = "block";
+        l.textContent += msg + "\n";
+        l.scrollTop = l.scrollHeight;
+      }
 
-function showTab(t){
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  $('tab-'+t).classList.add('active');
-  $('scan').classList.toggle('active', t==='scan');
-  $('mig').classList.toggle('active', t==='mig');
-}
-async function loadSamples(kind){
-  const r = await fetch('/api/samples?kind='+kind).then(r=>r.json());
-  if(kind==='py2'){ state.files2 = r.files; renderChips2(); } else { state.files = r.files; renderChips(); }
-}
-function renderChips(){
-  $('filechips').innerHTML = state.files.length
-    ? state.files.map((f,i)=>`<span class="chip"><b title="click to analyze this file" onclick="analyzeFile(${i},'files')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files')">×</span></span>`).join('')
-    : '<span class="muted">no files loaded</span>';
-}
-function renderChips2(){
-  $('filechips2').innerHTML = state.files2.length
-    ? state.files2.map((f,i)=>`<span class="chip"><b title="click to run the migration on this file" onclick="analyzeFile(${i},'files2')">${esc(f.name)}</b><span class="muted">${f.content.length}B</span><span class="v" title="preview source" onclick="previewFile(${i},'files2')">👁</span><span class="x" title="remove" onclick="removeFile(${i},'files2')">×</span></span>`).join('')
-    : '<span class="muted">no files loaded</span>';
-}
-function analyzeFile(i, which){
-  if(which === 'files') scanWith([state.files[i]]);
-  else migrateWith([state.files2[i]]);
-}
-function previewFile(i, which){
-  const f = state[which][i]; if(!f) return;
-  $('pvhead').textContent = f.name + '  ·  ' + f.content.length + ' bytes';
-  $('pvbody').textContent = f.content;
-  $('pv').style.display = 'flex';
-}
-function removeFile(i, which){
-  state[which].splice(i, 1);
-  (which === 'files' ? renderChips : renderChips2)();
-}
-function addFiles(fl){ for(const f of fl){ const rd=new FileReader(); rd.onload=()=>{state.files.push({name:f.name, content:rd.result}); renderChips();}; rd.readAsText(f);} }
-function addFiles2(fl){ for(const f of fl){ const rd=new FileReader(); rd.onload=()=>{state.files2.push({name:f.name, content:rd.result}); renderChips2();}; rd.readAsText(f);} }
-const drop = $('drop');
-['dragover','dragenter'].forEach(e=>drop.addEventListener(e, ev=>{ev.preventDefault(); drop.classList.add('over');}));
-['dragleave','drop'].forEach(e=>drop.addEventListener(e, ev=>{ev.preventDefault(); drop.classList.remove('over');}));
-drop.addEventListener('drop', ev=>{ addFiles(ev.dataTransfer.files); });
+      async function scan() {
+        const pathVal = ($("pathinput").value || "").trim();
+        if (state.files.length) return scanWith(state.files);
+        if (!pathVal) {
+          alert("Load/drop files or enter a codebase path first");
+          return;
+        }
+        return scanWith(null, pathVal);
+      }
+      async function scanWith(files, pathVal) {
+        $("scanbtn").disabled = true;
+        $("scanstatus").textContent = "scanning… (agents working)";
+        $("log").style.display = "none";
+        $("log").textContent = "";
+        try {
+          const body = {
+            engine: $("engine").value,
+            path:
+              pathVal ||
+              (files && files.length === 1 ? files[0].name : "upload"),
+          };
+          if (files) body.files = files;
+          const r = await fetch("/api/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await r.json();
+          if (data.error) throw new Error(data.error);
+          state.report = data;
+          $("scanstatus").textContent = "done";
+          if (data.trace) data.trace.forEach((t) => log("🤖 " + t));
+          renderScan(data);
+        } catch (e) {
+          $("scanstatus").textContent = "error: " + e.message;
+        }
+        $("scanbtn").disabled = false;
+      }
 
-function log(msg){ const l=$('log'); l.style.display='block'; l.textContent += msg+'\n'; l.scrollTop=l.scrollHeight; }
-
-async function scan(){
-  const pathVal = ($('pathinput').value||'').trim();
-  if(state.files.length) return scanWith(state.files);
-  if(!pathVal){ alert('Load/drop files or enter a codebase path first'); return; }
-  return scanWith(null, pathVal);
-}
-async function scanWith(files, pathVal){
-  $('scanbtn').disabled = true; $('scanstatus').textContent = 'scanning… (agents working)';
-  $('log').style.display='none'; $('log').textContent='';
-  try{
-    const body = {engine: $('engine').value, path: pathVal || (files && files.length===1 ? files[0].name : 'upload')};
-    if(files) body.files = files;
-    const r = await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)});
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
-    state.report = data;
-    $('scanstatus').textContent = 'done';
-    if(data.trace) data.trace.forEach(t=>log('🤖 '+t));
-    renderScan(data);
-  }catch(e){ $('scanstatus').textContent = 'error: '+e.message; }
-  $('scanbtn').disabled = false;
-}
-
-const SEVC = {critical:'#e5484d',high:'#f76b15',medium:'#ffc53d',low:'#46a758',info:'#6e7681'};
-function renderScan(d){
-  const counts={}; d.findings.forEach(f=>counts[f.severity]=(counts[f.severity]||0)+1);
-  const cards = Object.keys(SEVC).map(s=>`<span class="stat" style="border-color:${SEVC[s]}"><b>${counts[s]||0}</b> ${s}</span>`).join('');
-  const rems = {}; d.remediations.forEach(r=>rems[r.finding_id]=r);
-  const sevOrder = {critical:0,high:1,medium:2,low:3,info:4};
-  const findings = [...d.findings].sort((a,b)=>sevOrder[a.severity]-sevOrder[b.severity]).map(f=>{
-    const r = rems[f.id]; const cweNum = (f.cwe.split('-')[1])||'';
-    return `<details class="finding"><summary>
+      const SEVC = {
+        critical: "#e5484d",
+        high: "#f76b15",
+        medium: "#ffc53d",
+        low: "#46a758",
+        info: "#6e7681",
+      };
+      function renderScan(d) {
+        const counts = {};
+        d.findings.forEach(
+          (f) => (counts[f.severity] = (counts[f.severity] || 0) + 1),
+        );
+        const cards = Object.keys(SEVC)
+          .map(
+            (s) =>
+              `<span class="stat" style="border-color:${SEVC[s]}"><b>${counts[s] || 0}</b> ${s}</span>`,
+          )
+          .join("");
+        const rems = {};
+        d.remediations.forEach((r) => (rems[r.finding_id] = r));
+        const sevOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+        const findings = [...d.findings]
+          .sort((a, b) => sevOrder[a.severity] - sevOrder[b.severity])
+          .map((f) => {
+            const r = rems[f.id];
+            const cweNum = f.cwe.split("-")[1] || "";
+            return `<details class="finding"><summary>
       <span class="badge" style="background:${SEVC[f.severity]}">${esc(f.severity)}</span>
       <b>${esc(f.title)}</b>
       <a class="cwe" href="https://cwe.mitre.org/data/definitions/${cweNum}.html">${esc(f.cwe)}</a>
       <code>${esc(f.file)}:${f.line}</code>
       <span class="muted">${esc(f.source)} · conf ${esc(f.confidence)}</span></summary>
       <pre class="ev">${esc(f.evidence)}</pre><p style="font-size:13px">${esc(f.description)}</p>
-      ${r?`<div class="rem"><h4>🔧 ${esc(r.summary)}</h4><ol>${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
-      ${r.patch?`<pre class="patch">${esc(r.patch)}</pre>`:''}
-      ${r.tests&&r.tests.length?`<h4>Tests</h4><ul>${r.tests.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}
-      ${r.references&&r.references.length?`<h4>Refs</h4><ul>${r.references.map(u=>`<li><a href="${esc(u)}">${esc(u)}</a></li>`).join('')}</ul>`:''}
-      </div>`:''}
+      ${
+        r
+          ? `<div class="rem"><h4>🔧 ${esc(r.summary)}</h4><ol>${r.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+      ${r.patch ? `<pre class="patch">${esc(r.patch)}</pre>` : ""}
+      ${r.tests && r.tests.length ? `<h4>Tests</h4><ul>${r.tests.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+      ${r.references && r.references.length ? `<h4>Refs</h4><ul>${r.references.map((u) => `<li><a href="${esc(u)}">${esc(u)}</a></li>`).join("")}</ul>` : ""}
+      </div>`
+          : ""
+      }
     </details>`;
-  }).join('');
-  const m = d.migration;
-  const mods = (m.modules||[]).sort((a,b)=>a.order-b.order).map(x=>`<tr><td>${x.order}</td><td>${esc(x.component)}</td><td>${esc(x.current)}</td><td>${esc(x.target)}</td><td>${esc(x.effort)}</td><td>${esc(x.risk)}</td></tr>`).join('');
-  $('scanresults').innerHTML = `
+          })
+          .join("");
+        const m = d.migration;
+        const mods = (m.modules || [])
+          .sort((a, b) => a.order - b.order)
+          .map(
+            (x) =>
+              `<tr><td>${x.order}</td><td>${esc(x.component)}</td><td>${esc(x.current)}</td><td>${esc(x.target)}</td><td>${esc(x.effort)}</td><td>${esc(x.risk)}</td></tr>`,
+          )
+          .join("");
+        $("scanresults").innerHTML = `
     <div class="card">
-      <b>${esc(d.target)}</b> <span class="muted">engine ${esc(d.engine)} · model ${esc(d.model)} · ${d.scanned_files} files · ${esc(d.languages.join(', '))} · ${esc(d.generated_at)}</span>
-      ${d.voice_command?`<div class="voice">🎙 Voxtral heard: “${esc(d.voice_command)}”</div>`:''}
+      <b>${esc(d.target)}</b> <span class="muted">engine ${esc(d.engine)} · model ${esc(d.model)} · ${d.scanned_files} files · ${esc(d.languages.join(", "))} · ${esc(d.generated_at)}</span>
       <p>${esc(d.summary)}</p>
       <div class="stats">${cards}</div>
       <span class="muted">export:</span>
@@ -228,107 +719,115 @@ function renderScan(d){
       <a href="/api/export?kind=scan&fmt=json" target="_blank">JSON</a> ·
       <a href="/api/export?kind=scan&fmt=sarif" target="_blank">SARIF</a>
     </div>
-    <div class="card"><h3 style="margin-top:0">Findings (${d.findings.length})</h3>${findings||'<p class="muted">No findings 🎉</p>'}</div>
+    <div class="card"><h3 style="margin-top:0">Findings (${d.findings.length})</h3>${findings || '<p class="muted">No findings 🎉</p>'}</div>
     <div class="card"><h3 style="margin-top:0">🧭 Migration recommendation</h3>
       <p style="font-size:13px"><b>Strategy:</b> ${esc(m.strategy)}</p><p style="font-size:13px">${esc(m.summary)}</p>
-      ${m.quick_wins&&m.quick_wins.length?`<b>Quick wins:</b><ul style="font-size:13px">${m.quick_wins.map(q=>`<li>${esc(q)}</li>`).join('')}</ul>`:''}
-      <b>Phases:</b><ol style="font-size:13px">${(m.phases||[]).map(p=>`<li>${esc(p)}</li>`).join('')}</ol>
-      ${mods?`<table><tr><th>#</th><th>Component</th><th>Current</th><th>Target</th><th>Effort</th><th>Risk</th></tr>${mods}</table>`:''}
+      ${m.quick_wins && m.quick_wins.length ? `<b>Quick wins:</b><ul style="font-size:13px">${m.quick_wins.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>` : ""}
+      <b>Phases:</b><ol style="font-size:13px">${(m.phases || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ol>
+      ${mods ? `<table><tr><th>#</th><th>Component</th><th>Current</th><th>Target</th><th>Effort</th><th>Risk</th></tr>${mods}</table>` : ""}
     </div>`;
-}
+      }
 
-async function toggleMic(){
-  if(state.rec){ state.rec.stop(); return; }
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    const rec = new MediaRecorder(stream);
-    state.chunks = []; state.rec = rec;
-    rec.ondataavailable = e=>state.chunks.push(e.data);
-    rec.onstop = async ()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      $('recdot').style.display='none'; $('micbtn').textContent='🎤 Voice command (Voxtral)';
-      const blob = new Blob(state.chunks, {type: rec.mimeType||'audio/webm'});
-      const buf = await blob.arrayBuffer();
-      let bin=''; const bytes=new Uint8Array(buf);
-      for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
-      $('scanstatus').textContent='transcribing with Voxtral…';
-      const r = await fetch('/api/voice', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({audio_b64: btoa(bin), filename:'cmd.webm', files: state.files, engine: $('engine').value})});
-      const data = await r.json();
-      if(data.error) throw new Error(data.error);
-      state.report = data.report;
-      $('scanstatus').textContent='done — heard: “'+data.transcript+'”';
-      log('🎙 Voxtral: '+data.transcript);
-      (data.report.trace||[]).forEach(t=>log('🤖 '+t));
-      renderScan(data.report);
-    };
-    rec.start();
-    $('recdot').style.display='inline-block'; $('micbtn').textContent='Stop & run';
-  }catch(e){ alert('Mic unavailable: '+e.message+' — you can still scan with files.'); }
-}
+      async function migrate() {
+        return migrateWith(state.files2.length ? state.files2 : null);
+      }
+      async function migrateWith(files) {
+        $("migbtn").disabled = true;
+        $("migstatus").textContent = "running workflow…";
+        $("steps").style.display = "flex";
+        [
+          ["st1", true],
+          ["st2", false],
+          ["st3", false],
+          ["st4", false],
+        ].forEach(([id, done]) => {
+          $(id).className = "step" + (done ? " done" : "");
+        });
+        try {
+          const r = await fetch("/api/migrate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              files,
+              path:
+                files && files.length === 1 ? files[0].name : "samples/python2",
+              engine: $("engine2").value,
+            }),
+          });
+          const d = await r.json();
+          if (d.error) throw new Error(d.error);
+          state.mig = d;
+          $("st1").className = "step done";
+          $("st3").className = "step done";
+          $("st2").className =
+            "step " + (d.engine !== "offline" ? "done" : "run");
+          $("st4").className = "step done";
+          $("migstatus").textContent = "done";
+          renderMig(d);
+        } catch (e) {
+          $("migstatus").textContent = "error: " + e.message;
+        }
+        $("migbtn").disabled = false;
+      }
 
-async function speakSummary(){
-  if(!state.report){ alert('run a scan first'); return; }
-  const r = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({text: 'Summary. '+state.report.summary})});
-  if(!r.ok){ alert('TTS failed: '+(await r.json()).error); return; }
-  const blob = await r.blob();
-  new Audio(URL.createObjectURL(blob)).play();
-}
-
-async function migrate(){
-  return migrateWith(state.files2.length ? state.files2 : null);
-}
-async function migrateWith(files){
-  $('migbtn').disabled = true; $('migstatus').textContent = 'running workflow…';
-  $('steps').style.display='flex';
-  [['st1',true],['st2',false],['st3',false],['st4',false]].forEach(([id,done])=>{$(id).className='step'+(done?' done':'');});
-  try{
-    const r = await fetch('/api/migrate', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({files, path: files && files.length===1 ? files[0].name : 'samples/python2', engine: $('engine2').value})});
-    const d = await r.json();
-    if(d.error) throw new Error(d.error);
-    state.mig = d;
-    $('st1').className='step done'; $('st3').className='step done';
-    $('st2').className='step '+(d.engine!=='offline'?'done':'run');
-    $('st4').className='step done';
-    $('migstatus').textContent = 'done';
-    renderMig(d);
-  }catch(e){ $('migstatus').textContent='error: '+e.message; }
-  $('migbtn').disabled = false;
-}
-
-function diffHtml(diff){
-  return diff.split('\n').map(l=>{
-    const cls = l.startsWith('+++')||l.startsWith('---') ? 'hdr' : l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : 'ctx';
-    return `<span class="${cls}">${esc(l)}</span>`;
-  }).join('\n');
-}
-function renderMig(d){
-  const items = d.plan.items;
-  const rows = items.map(i=>`<tr><td><code>${esc(i.file)}</code></td><td>${i.line}</td><td>${esc(i.title)}</td><td><code>${esc(i.rule_id)}</code></td>
-    <td><span class="chg ${i.change}">${i.change}</span></td><td><code>${esc(i.after)}</code></td><td class="muted">${esc(i.explanation||'')}</td></tr>`).join('');
-  const diffs = Object.entries(d.diffs).map(([p,dd])=>`<h4><code>${esc(p)}</code></h4><pre class="diff">${diffHtml(dd)}</pre>`).join('');
-  $('migresults').innerHTML = `
+      function diffHtml(diff) {
+        return diff
+          .split("\n")
+          .map((l) => {
+            const cls =
+              l.startsWith("+++") || l.startsWith("---")
+                ? "hdr"
+                : l.startsWith("+")
+                  ? "add"
+                  : l.startsWith("-")
+                    ? "del"
+                    : "ctx";
+            return `<span class="${cls}">${esc(l)}</span>`;
+          })
+          .join("\n");
+      }
+      function renderMig(d) {
+        const items = d.plan.items;
+        const rows = items
+          .map(
+            (
+              i,
+            ) => `<tr><td><code>${esc(i.file)}</code></td><td>${i.line}</td><td>${esc(i.title)}</td><td><code>${esc(i.rule_id)}</code></td>
+    <td><span class="chg ${i.change}">${i.change}</span></td><td><code>${esc(i.after)}</code></td><td class="muted">${esc(i.explanation || "")}</td></tr>`,
+          )
+          .join("");
+        const diffs = Object.entries(d.diffs)
+          .map(
+            ([p, dd]) =>
+              `<h4><code>${esc(p)}</code></h4><pre class="diff">${diffHtml(dd)}</pre>`,
+          )
+          .join("");
+        $("migresults").innerHTML = `
     <div class="card"><b>${esc(d.target)}</b> <span class="muted">engine ${esc(d.engine)} · model ${esc(d.model)} · ${esc(d.generated_at)}</span>
       <p>${esc(d.summary)}</p>
       <span class="muted">export:</span> <a href="/api/export?kind=migrate&fmt=html" target="_blank">HTML</a> ·
       <a href="/api/export?kind=migrate&fmt=md" target="_blank">Markdown</a> ·
       <a href="/api/export?kind=migrate&fmt=json" target="_blank">JSON</a>
-      ${(d.trace||[]).map(t=>`<div class="muted">🤖 ${esc(t)}</div>`).join('')}
+      ${(d.trace || []).map((t) => `<div class="muted">🤖 ${esc(t)}</div>`).join("")}
     </div>
     <div class="card"><h3 style="margin-top:0">📋 Needs to change (${items.length})</h3>
       <table><tr><th>File</th><th>Line</th><th>Issue</th><th>Rule</th><th>Change</th><th>Fix</th><th>Notes</th></tr>${rows}</table></div>
-    <div class="card"><h3 style="margin-top:0">✅ What changed (automated diff)</h3>${diffs||'<p class="muted">No mechanical changes required.</p>'}</div>
-    <div class="card"><h3 style="margin-top:0">Checklist</h3><ul style="font-size:13px">${d.plan.checklist.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
-      <h4>Test plan</h4><ul style="font-size:13px">${d.plan.test_plan.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
-      <h4>Risks</h4><ul style="font-size:13px">${d.plan.risks.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></div>`;
-}
+    <div class="card"><h3 style="margin-top:0">✅ What changed (automated diff)</h3>${diffs || '<p class="muted">No mechanical changes required.</p>'}</div>
+    <div class="card"><h3 style="margin-top:0">Checklist</h3><ul style="font-size:13px">${d.plan.checklist.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+      <h4>Test plan</h4><ul style="font-size:13px">${d.plan.test_plan.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+      <h4>Risks</h4><ul style="font-size:13px">${d.plan.risks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
+      }
 
-fetch('/api/health').then(r=>r.json()).then(h=>{
-  document.querySelector('.badges').insertAdjacentHTML('beforeend',
-    `<span>model ${esc(h.model)}</span><span>${h.has_api_key?'🔑 API key set':'⚠ no API key (offline mode)'}</span><span>${h.agents_sdk?'agents-sdk ✓':'agents-sdk ✗'}</span>`);
-});
-</script>
-</body>
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((h) => {
+          document
+            .querySelector(".badges")
+            .insertAdjacentHTML(
+              "beforeend",
+              `<span>model ${esc(h.model)}</span><span>${h.has_api_key ? "🔑 API key set" : "⚠ no API key (offline mode)"}</span><span>${h.agents_sdk ? "agents-sdk ✓" : "agents-sdk ✗"}</span>`,
+            );
+        });
+    </script>
+  </body>
 </html>
